@@ -1,0 +1,91 @@
+@import './tokens.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Respect the OS setting — the motion layer checks this too, but killing it
+     at the CSS level covers anything framer-motion does not own. */
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  body {
+    @apply bg-bg-page text-content-primary antialiased;
+    font-family: var(--font-active);
+    line-height: var(--leading-body);
+    /* Prevents the hero glows from creating a horizontal scrollbar on mobile. */
+    overflow-x: hidden;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4 {
+    letter-spacing: var(--tracking-display);
+    line-height: var(--leading-tight);
+  }
+
+  /* One focus treatment for the whole product. Visible on dark and light. */
+  :focus-visible {
+    outline: 2.5px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+
+  .on-dark :focus-visible {
+    outline-color: var(--color-solar-300);
+  }
+
+  /* Numeric data lines up in columns without a monospace font, and stays
+     left-to-right even inside an Arabic sentence. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .numeric {
+    font-variant-numeric: tabular-nums;
+    direction: ltr;
+    unicode-bidi: isolate;
+  }
+
+  /* The brand name is never translated or mirrored. */
+  .brand-lockup {
+    direction: ltr;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .container-page {
+    @apply mx-auto w-full max-w-container px-5 md:px-8 lg:px-12;
+  }
+
+  /* Section rhythm: 64 / 80 / 96 from the spacing scale. */
+  .section-y {
+    @apply py-16 md:py-20 lg:py-24;
+  }
+
+  /* Uppercase + tracked-out section labels are a Latin device. Arabic has no
+     letter case, and tracking it out separates joined letters. */
+  .eyebrow {
+    @apply text-overline uppercase;
+  }
+  :root[lang='ar'] .eyebrow {
+    @apply text-[0.8rem] normal-case tracking-normal;
+  }
+}

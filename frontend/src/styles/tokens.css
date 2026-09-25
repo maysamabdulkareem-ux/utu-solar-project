@@ -1,0 +1,225 @@
+/**
+ * Utu — "Solar Sunset" design tokens
+ * ---------------------------------------------------------------------------
+ * A warm sunset sky reflected across dark photovoltaic panels.
+ * These values are the source of truth and mirror the Figma variable
+ * collections 1:1:
+ *   Figma "1. Primitives"  ->  --color-*, --space-*, --radius-*
+ *   Figma "2. Semantic"    ->  --bg-*, --text-*, --border-*, --brand-*, --status-*
+ *
+ * Colour hierarchy is 60 / 30 / 10:
+ *   60%  neutral + panel structure
+ *   30%  solar amber (brand)
+ *   10%  sunset coral / dusk blue accents
+ * Never hard-code a hex in a component. Add a token instead.
+ */
+
+:root {
+  /* ===== PRIMITIVES — panel (deep photovoltaic) ===== */
+  --color-panel-900: #0a0f13;
+  --color-panel-800: #101a21;
+  --color-panel-700: #16242d;
+  --color-panel-600: #1d303b;
+  --color-panel-500: #294451;
+  --color-panel-400: #3c5e6e;
+
+  /* ===== PRIMITIVES — solar (golden energy, primary brand) ===== */
+  --color-solar-50: #fff8ea;
+  --color-solar-100: #fdeecb;
+  --color-solar-200: #fbdc98;
+  --color-solar-300: #f7c55f;
+  --color-solar-400: #f2ac2e;
+  --color-solar-500: #e5920f;
+  --color-solar-600: #c1740a;
+  --color-solar-700: #96570c;
+  --color-solar-800: #6e400e;
+
+  /* ===== PRIMITIVES — sunset (coral / terracotta accents) ===== */
+  --color-sunset-50: #fef2ee;
+  --color-sunset-100: #fbdfd5;
+  --color-sunset-200: #f6bfab;
+  --color-sunset-300: #ef9a7c;
+  --color-sunset-400: #e5754f;
+  --color-sunset-500: #d45633;
+  --color-sunset-600: #b13f23;
+  --color-sunset-700: #8a321d;
+
+  /* ===== PRIMITIVES — dusk (sky blue, secondary + focus) ===== */
+  --color-dusk-50: #f0f2f8;
+  --color-dusk-100: #dde2ef;
+  --color-dusk-200: #bbc4dc;
+  --color-dusk-300: #94a1c4;
+  --color-dusk-400: #6b7ba6;
+  --color-dusk-500: #4d5c86;
+  --color-dusk-600: #3a4769;
+  --color-dusk-700: #2b3450;
+
+  /* ===== PRIMITIVES — sage (natural balance, verified) ===== */
+  --color-sage-50: #f1f4ee;
+  --color-sage-100: #dfe6d8;
+  --color-sage-200: #c2cfb6;
+  --color-sage-300: #a1b391;
+  --color-sage-400: #82966f;
+  --color-sage-500: #677b55;
+  --color-sage-600: #4f6141;
+  --color-sage-700: #3c4a32;
+
+  /* ===== PRIMITIVES — warm neutrals ===== */
+  --color-neutral-0: #ffffff;
+  --color-neutral-50: #fdfaf6;
+  --color-neutral-100: #f7f2ea;
+  --color-neutral-150: #f1eae0;
+  --color-neutral-200: #e7ded0;
+  --color-neutral-300: #d5c9b7;
+  --color-neutral-400: #afa491;
+  --color-neutral-500: #847a6b;
+  --color-neutral-600: #5f574b;
+  --color-neutral-700: #443e35;
+  --color-neutral-800: #2a261f;
+  --color-neutral-900: #17140f;
+
+  /* ===== PRIMITIVES — danger (kept distinct from sunset coral) ===== */
+  --color-danger-100: #fbddd9;
+  --color-danger-300: #e8867e;
+  --color-danger-500: #b3261e;
+  --color-danger-600: #8f1d17;
+  --color-danger-900: #5a1712;
+
+  /* ===== SEMANTIC — surfaces ===== */
+  --bg-page: var(--color-neutral-50);
+  --bg-subtle: var(--color-neutral-100);
+  --bg-surface: var(--color-neutral-0);
+  --bg-inverse: var(--color-panel-900);
+  --bg-panel-deep: var(--color-panel-800);
+  --bg-panel-raised: var(--color-panel-700);
+
+  /* ===== SEMANTIC — text ===== */
+  --text-primary: var(--color-neutral-900);
+  --text-secondary: var(--color-neutral-600);
+  --text-tertiary: var(--color-neutral-500);
+  --text-on-brand: var(--color-panel-900);
+  --text-on-dark: var(--color-neutral-50);
+  --text-on-dark-muted: var(--color-neutral-300);
+  --text-brand: var(--color-solar-600);
+  --text-disabled: var(--color-neutral-400);
+
+  /* ===== SEMANTIC — borders ===== */
+  --border-subtle: var(--color-neutral-200);
+  --border-default: var(--color-neutral-300);
+  --border-strong: var(--color-neutral-400);
+  --border-brand: var(--color-solar-400);
+  --border-on-dark: var(--color-panel-600);
+
+  /* ===== SEMANTIC — brand + status ===== */
+  --brand-primary: var(--color-solar-500);
+  --brand-primary-hover: var(--color-solar-600);
+  --brand-primary-press: var(--color-solar-700);
+  --brand-subtle: var(--color-solar-50);
+  --status-success: var(--color-sage-600);
+  --status-success-bg: var(--color-sage-50);
+  --status-warning: var(--color-solar-600);
+  --status-warning-bg: var(--color-solar-50);
+  --status-danger: var(--color-danger-500);
+  --status-danger-bg: var(--color-danger-100);
+  --focus-ring: var(--color-dusk-500);
+
+  /* ===== TYPOGRAPHY ===== */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-arabic: 'Noto Sans Arabic', 'Inter', system-ui, sans-serif;
+
+  /* Switched by <html lang>. Components read --font-active, never a family
+     directly, so one attribute flips the whole page's typography. */
+  --font-active: var(--font-sans);
+  --leading-body: 1.625;
+  --leading-tight: 1.14;
+  --tracking-display: -0.02em;
+
+  --fs-display-xl: 2.75rem; /* 44px mobile -> 64px desktop, see media query */
+  --lh-display-xl: 3rem;
+  --fs-display-l: 2.25rem;
+  --lh-display-l: 2.625rem;
+  --fs-h1: 2rem;
+  --lh-h1: 2.375rem;
+  --fs-h2: 1.625rem;
+  --lh-h2: 2.125rem;
+  --fs-h3: 1.375rem;
+  --lh-h3: 1.875rem;
+  --fs-h4: 1.125rem;
+  --lh-h4: 1.625rem;
+
+  /* ===== SPACING — 4px base grid ===== */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+  --space-20: 5rem;
+  --space-24: 6rem;
+  --space-30: 7.5rem;
+
+  /* ===== RADIUS ===== */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-2xl: 28px;
+
+  /* ===== ELEVATION — warm-tinted, never pure black ===== */
+  --shadow-sm: 0 1px 2px rgba(23, 20, 15, 0.06);
+  --shadow-md: 0 4px 12px rgba(23, 20, 15, 0.08);
+  --shadow-lg: 0 12px 32px rgba(23, 20, 15, 0.12);
+  --shadow-glow: 0 8px 32px rgba(229, 146, 15, 0.28);
+  --shadow-panel: 0 20px 56px rgba(0, 0, 0, 0.45);
+
+  /* ===== LAYOUT ===== */
+  --container-max: 1344px;
+  --header-height: 76px;
+}
+
+/* ===== ARABIC =====
+   Arabic letterforms join, so negative tracking breaks them; ascenders and
+   descenders also need more vertical room than Latin at the same size. */
+:root[lang='ar'] {
+  --font-active: var(--font-arabic);
+  --leading-body: 1.85;
+  --leading-tight: 1.35;
+  --tracking-display: 0;
+}
+
+/* Tablet and up */
+@media (min-width: 768px) {
+  :root {
+    --fs-display-xl: 3.25rem;
+    --lh-display-xl: 3.5rem;
+    --fs-display-l: 2.75rem;
+    --lh-display-l: 3rem;
+    --fs-h1: 2.375rem;
+    --lh-h1: 2.875rem;
+    --fs-h2: 2rem;
+    --lh-h2: 2.5rem;
+    --fs-h3: 1.5rem;
+    --lh-h3: 2rem;
+    --fs-h4: 1.25rem;
+    --lh-h4: 1.75rem;
+  }
+}
+
+/* Desktop */
+@media (min-width: 1024px) {
+  :root {
+    --fs-display-xl: 4rem;
+    --lh-display-xl: 4.25rem;
+    --fs-display-l: 3.25rem;
+    --lh-display-l: 3.625rem;
+    --fs-h1: 2.75rem;
+    --lh-h1: 3.25rem;
+    --fs-h2: 2.125rem;
+    --lh-h2: 2.625rem;
+  }
+}
