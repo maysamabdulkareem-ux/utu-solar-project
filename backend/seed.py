@@ -13,36 +13,42 @@ def seed_companies():
             print("Companies already exist. Skipping.")
             return
 
+        # Names/addresses/status here must stay identical to the sample
+        # companies in the frontend (src/data/content.ts: 'rafidain',
+        # 'tigris', 'nahrain') — the UI falls back to that sample list
+        # whenever this API is unreachable, so if the two ever diverge the
+        # cards would visibly swap identities the moment the backend comes
+        # online.
         companies = [
             Company(
-                name="Demo Solar Company A",
-                logo_url="https://example.com/logos/demo-a.png",
-                founded_year=2015,
+                name="الرافدين للأنظمة الشمسية",
+                logo_url="https://example.com/logos/rafidain.png",
+                founded_year=2017,
                 projects_count=120,
-                phone="+964 000 000 0001",
-                email="info@demo-a.example",
-                address="Baghdad, Iraq (Demo)",
+                phone="+964 770 100 0001",
+                email="info@rafidain-solar.example",
+                address="بغداد · المنصور",
                 verification_status="verified",
             ),
             Company(
-                name="Demo Solar Company B",
-                logo_url="https://example.com/logos/demo-b.png",
-                founded_year=2019,
-                projects_count=45,
-                phone="+964 000 000 0002",
-                email="contact@demo-b.example",
-                address="Erbil, Iraq (Demo)",
+                name="دجلة لأعمال الطاقة",
+                logo_url="https://example.com/logos/tigris.png",
+                founded_year=2020,
+                projects_count=78,
+                phone="+964 770 100 0002",
+                email="contact@tigris-energy.example",
+                address="بغداد · الكرادة",
+                verification_status="verified",
+            ),
+            Company(
+                name="النهرين للطاقة المتجددة",
+                logo_url="https://example.com/logos/nahrain.png",
+                founded_year=2023,
+                projects_count=35,
+                phone="+964 770 100 0003",
+                email="hello@nahrain-renewables.example",
+                address="البصرة · العشار",
                 verification_status="pending",
-            ),
-            Company(
-                name="Demo Solar Company C",
-                logo_url="https://example.com/logos/demo-c.png",
-                founded_year=2021,
-                projects_count=12,
-                phone="+964 000 000 0003",
-                email="hello@demo-c.example",
-                address="Basra, Iraq (Demo)",
-                verification_status="verified",
             ),
         ]
 
