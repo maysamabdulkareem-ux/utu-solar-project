@@ -38,14 +38,19 @@ export function UtuAssistant({
   tier,
   insight,
   companyCount,
+  open,
+  onOpenChange,
 }: {
   estimate: SolarEstimate;
   tier: SystemTier;
   insight: AssessmentInsight;
   companyCount: number;
+  /** Controlled by the page so an in-page button can open it too. */
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }) {
   const { t } = useLanguage();
-  const [open, setOpen] = useState(false);
+  const setOpen = onOpenChange;
   const [asked, setAsked] = useState<{ id: QuickQuestionId; values: AnswerValues; answerKey: TranslationKey }[]>([]);
   // Once a question is answered the list folds away so the answer stays in view.
   const [showQuick, setShowQuick] = useState(true);
@@ -60,7 +65,7 @@ export function UtuAssistant({
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [open]);
+  }, [open, setOpen]);
 
   useEffect(() => {
     endRef.current?.scrollIntoView?.({ block: 'end' });
@@ -89,7 +94,8 @@ export function UtuAssistant({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className="fixed bottom-6 end-6 z-40 flex items-center gap-2 rounded-full bg-[var(--brand-primary)] px-5 py-3.5 text-label font-semibold text-content-on-brand shadow-lg transition-colors hover:bg-[var(--brand-primary-hover)]"
+        aria-haspopup="dialog"
+        className="fixed bottom-6 end-6 z-40 flex items-center gap-2 rounded-full bg-[var(--brand-primary)] px-5 py-3.5 text-label font-semibold text-content-on-brand shadow-lg ring-4 ring-[var(--brand-subtle)] transition-colors hover:bg-[var(--brand-primary-hover)]"
       >
         <Icon name="zap" size={17} />
         {t('as.assistant.entry')}

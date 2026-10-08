@@ -82,6 +82,8 @@ export const assessmentEn = {
   'as.companies.loading': 'Loading companies…',
 
   'as.assistant.entry': 'Ask UTU assistant',
+  'as.assistant.inlineTitle': 'Have a question about your system? Ask the UTU assistant',
+  'as.assistant.inlineBody': 'Quick answers: why this size, backup hours, lowering the cost, and more.',
   'as.assistant.title': 'UTU assistant',
   'as.assistant.opening': 'Hi! Pick a question below — I answer from this assessment’s own numbers.',
   'as.assistant.quickTitle': 'Quick questions',
@@ -189,6 +191,8 @@ export const assessmentAr: Record<AssessmentKey, string> = {
   'as.companies.loading': 'جاري تحميل الشركات…',
 
   'as.assistant.entry': 'اسأل مساعد UTU',
+  'as.assistant.inlineTitle': 'عندك سؤال عن منظومتك؟ اسأل مساعد UTU',
+  'as.assistant.inlineBody': 'أجوبة سريعة: ليش هذا الحجم، ساعات الخزن، تقليل الكلفة، وغيرها.',
   'as.assistant.title': 'مساعد UTU',
   'as.assistant.opening': 'هلا! اختار سؤال من الأسئلة الجاهزة — أجاوبك من أرقام تقييمك نفسه.',
   'as.assistant.quickTitle': 'أسئلة سريعة',

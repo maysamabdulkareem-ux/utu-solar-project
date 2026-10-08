@@ -41,6 +41,7 @@ export function AssessmentPage() {
   const { startFromSystem } = useQuoteRequest();
   const { companies, source } = useCompanies();
   const [selectedTier, setSelectedTier] = useState<TierId>('balanced');
+  const [assistantOpen, setAssistantOpen] = useState(false);
 
   const estimate = useSolarEstimate(appliances ?? []);
   const tiers = useMemo(() => buildTiers(estimate), [estimate]);
@@ -81,6 +82,20 @@ export function AssessmentPage() {
           </a>
           <h1 className="mt-4 text-h1 text-content-primary">{t('as.title')}</h1>
           <p className="mt-2 max-w-2xl text-body text-content-secondary">{t('as.subtitle')}</p>
+          <button
+            type="button"
+            onClick={() => setAssistantOpen(true)}
+            aria-haspopup="dialog"
+            className="mt-5 inline-flex items-center gap-3 rounded-xl border-[1.5px] border-line-brand bg-[var(--brand-subtle)] px-4 py-3 text-start transition-colors hover:bg-bg-surface"
+          >
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--brand-primary)] text-content-on-brand">
+              <Icon name="zap" size={17} />
+            </span>
+            <span>
+              <span className="block text-label font-semibold text-content-primary">{t('as.assistant.inlineTitle')}</span>
+              <span className="block text-label-sm text-content-secondary">{t('as.assistant.inlineBody')}</span>
+            </span>
+          </button>
         </header>
 
         <RecommendationTiers
@@ -106,6 +121,8 @@ export function AssessmentPage() {
         tier={tiers[selectedTier]}
         insight={insight}
         companyCount={quotable.length}
+        open={assistantOpen}
+        onOpenChange={setAssistantOpen}
       />
     </>
   );
