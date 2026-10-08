@@ -10,7 +10,6 @@ import { Trust } from '../sections/Trust';
 import { WarrantySection } from '../sections/WarrantySection';
 import { CustomerReviews } from '../sections/CustomerReviews';
 import { FinalCTA } from '../sections/FinalCTA';
-import { useLanguage } from '../i18n/LanguageProvider';
 
 /**
  * Homepage composition.
@@ -20,17 +19,10 @@ import { useLanguage } from '../i18n/LanguageProvider';
  * see real projects -> check trust and warranty -> read reviews -> convert.
  */
 export function HomePage() {
-  const { lang } = useLanguage();
-
   return (
     <>
       <Header />
       <main id="main">
-        <p role="note" className="border-b border-line-subtle bg-bg-subtle px-4 py-2.5 text-center text-label-sm text-content-secondary">
-          {lang === 'ar'
-            ? 'نسخة تجريبية: الأرقام والصور والمشاريع أمثلة. قد تظهر مراجعات العملاء الموثّقة مع مراجعات تجريبية.'
-            : 'Preview: displayed figures, photos and projects are examples. Verified customer reviews may appear alongside sample reviews.'}
-        </p>
         <Hero />
         <CalculatorSection />
         <HowItWorks />
