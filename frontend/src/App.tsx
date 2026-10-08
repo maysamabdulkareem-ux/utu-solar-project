@@ -1,6 +1,7 @@
 import { HomePage } from './pages/HomePage';
 import { RequestQuotePage } from './pages/RequestQuotePage';
 import { MyRequestsPage } from './pages/MyRequestsPage';
+import { AssessmentPage } from './pages/AssessmentPage';
 import { useHashRoute } from './routes/useHashRoute';
 import { useLanguage } from './i18n/LanguageProvider';
 
@@ -25,6 +26,7 @@ export default function App() {
 
       {route === 'request' && <RequestQuotePage />}
       {route === 'requests' && <MyRequestsPage />}
+      {route === 'assessment' && <AssessmentPage />}
       {route === 'home' && <HomePage />}
     </>
   );

@@ -1,4 +1,5 @@
 import { rfqAr, rfqEn } from './translations.rfq';
+import { assessmentAr, assessmentEn } from './translations.assessment';
 
 /**
  * UI strings, English and Arabic.
@@ -174,8 +175,8 @@ const site = {
   'ft.s3': 'FAQ',
 } as const;
 
-/** Site chrome plus the request-for-quote flow. */
-const en = { ...site, ...rfqEn };
+/** Site chrome plus the request-for-quote flow and the AI assessment flow. */
+const en = { ...site, ...rfqEn, ...assessmentEn };
 
 export type TranslationKey = keyof typeof en;
 
@@ -334,6 +335,6 @@ const siteAr: Record<keyof typeof site, string> = {
   'ft.s3': 'الأسئلة الشائعة',
 };
 
-const ar: Record<TranslationKey, string> = { ...siteAr, ...rfqAr };
+const ar: Record<TranslationKey, string> = { ...siteAr, ...rfqAr, ...assessmentAr };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { en, ar };

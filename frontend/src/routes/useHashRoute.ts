@@ -7,19 +7,21 @@ import { useCallback, useEffect, useState } from 'react';
  * machinery than the app currently earns. Swapping in react-router later means
  * replacing this file and the switch in App.tsx; nothing else reads the hash.
  */
-export type Route = 'home' | 'request' | 'requests';
+export type Route = 'home' | 'request' | 'requests' | 'assessment';
 
 const ROUTES: Record<string, Route> = {
   '': 'home',
   '#/': 'home',
   '#/request': 'request',
   '#/requests': 'requests',
+  '#/assessment': 'assessment',
 };
 
 export const paths: Record<Route, string> = {
   home: '#/',
   request: '#/request',
   requests: '#/requests',
+  assessment: '#/assessment',
 };
 
 function read(): Route {

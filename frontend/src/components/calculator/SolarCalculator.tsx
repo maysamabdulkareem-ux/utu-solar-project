@@ -7,6 +7,7 @@ import { ASSUMPTIONS, useSolarEstimate } from './useSolarEstimate';
 import { defaultAppliances, extraAppliances, type Appliance } from '../../data/content';
 import { fmt, useLanguage } from '../../i18n/LanguageProvider';
 import { useQuoteRequest } from '../../state/QuoteRequestProvider';
+import { useAssessment } from '../../state/AssessmentProvider';
 import { paths } from '../../routes/useHashRoute';
 
 /**
@@ -20,6 +21,7 @@ import { paths } from '../../routes/useHashRoute';
 export function SolarCalculator() {
   const { t } = useLanguage();
   const { seedFromEstimate } = useQuoteRequest();
+  const { start: startAssessment } = useAssessment();
   const [appliances, setAppliances] = useState<Appliance[]>(defaultAppliances);
   const [activeId, setActiveId] = useState<string>(defaultAppliances[0].id);
   const [calculating, setCalculating] = useState(false);
@@ -47,6 +49,12 @@ export function SolarCalculator() {
     window.setTimeout(() => {
       setCalculating(false);
       setCalculated(true);
+      // Hand this exact appliance snapshot to the AI Assessment flow — the
+      // Calculation Engine's output, not a re-guess — and move into the
+      // AI Analysis screen rather than only revealing numbers in place.
+      startAssessment(appliances);
+      window.location.hash = paths.assessment;
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }, 1200);
   };
 
