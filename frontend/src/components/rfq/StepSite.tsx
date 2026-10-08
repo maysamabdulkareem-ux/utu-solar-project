@@ -95,6 +95,7 @@ export function StepSite({ errors }: { errors: StepErrors }) {
           type="number"
           inputMode="numeric"
           min={1}
+          placeholder={t('s2.areaPlaceholder')}
           suffix={t('s2.areaUnit')}
           value={draft.roofArea}
           error={errors.roofArea}

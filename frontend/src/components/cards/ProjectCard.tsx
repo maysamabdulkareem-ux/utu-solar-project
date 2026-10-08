@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { Icon } from '../icons/Icon';
 import { SolarArray } from '../ui/SolarArray';
+import { Button } from '../ui/Button';
 import { cardHover } from '../../motion/animation';
 import { useReducedMotion } from '../../motion/useReducedMotion';
 import { useLanguage } from '../../i18n/LanguageProvider';
@@ -13,10 +14,11 @@ import type { Project } from '../../data/content';
  * treatment when it does not, so the section never has a hole in it while the
  * photo library is still being filled.
  */
-export function ProjectCard({ project }: { project: Project }) {
+export function ProjectCard({ project, onView }: { project: Project; onView?: (project: Project) => void }) {
   const prefersReduced = useReducedMotion();
   const { t, pick } = useLanguage();
   const location = pick(project.location);
+  const verifiedReview = project.verifiedReview;
 
   const status = (
     <p className="absolute start-3.5 top-3.5 inline-flex items-center gap-1.5 rounded-full bg-[rgba(241,244,238,0.95)] py-1 ps-2.5 pe-3 text-label-sm text-sage-600">
@@ -106,6 +108,48 @@ export function ProjectCard({ project }: { project: Project }) {
             {project.rating.toFixed(1)}
           </p>
         </div>
+
+        {verifiedReview?.is_verified && project.companyVerificationStatus === 'verified' && (
+          <section className="rounded-lg border border-line-brand bg-[var(--brand-subtle)] p-3">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div
+                role="img"
+                aria-label={t('rate.aria', { s: verifiedReview.rating })}
+                className="flex items-center gap-0.5 text-solar-500"
+              >
+                {Array.from({ length: 5 }, (_, index) => (
+                  <Icon
+                    key={index}
+                    name="star"
+                    size={15}
+                    className={index < Math.round(verifiedReview.rating) ? '' : 'opacity-30'}
+                  />
+                ))}
+                <span className="numeric ms-1 text-label-sm text-content-primary">
+                  {verifiedReview.rating.toFixed(1)}
+                </span>
+              </div>
+              <span className="inline-flex items-center gap-1 rounded-full bg-bg-surface px-2 py-1 text-body-xs text-content-brand">
+                <Icon name="check" size={12} />
+                {t('rv.verifiedPurchase')}
+              </span>
+            </div>
+            <blockquote className="mt-2 line-clamp-3 text-body-sm text-content-secondary">
+              {verifiedReview.comment}
+            </blockquote>
+            <p className="mt-2 text-label-sm text-content-tertiary">{verifiedReview.client_name}</p>
+          </section>
+        )}
+
+        <Button
+          size="md"
+          variant="secondary"
+          trailingArrow
+          className="w-full"
+          onClick={() => onView?.(project)}
+        >
+          {t('pr.viewProject')}
+        </Button>
       </div>
     </motion.article>
   );

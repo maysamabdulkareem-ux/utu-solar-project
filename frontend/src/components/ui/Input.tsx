@@ -1,4 +1,4 @@
-import { forwardRef, useId, type InputHTMLAttributes } from 'react';
+import { forwardRef, useId, type InputHTMLAttributes, type ReactNode } from 'react';
 import { cn } from '../../lib/cn';
 import { Field, fieldBoxClass } from './Field';
 
@@ -6,6 +6,7 @@ export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
   label: string;
   /** Unit or currency rendered inside the field, after the value. */
   suffix?: string;
+  endAdornment?: ReactNode;
   /** Fixed text before the value, e.g. a country code. */
   prefix?: string;
   hint?: string;
@@ -22,7 +23,7 @@ export type InputProps = Omit<InputHTMLAttributes<HTMLInputElement>, 'size'> & {
  * points at whichever of hint/error is live, and `aria-invalid` flips with it.
  */
 export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
-  { label, prefix, suffix, hint, error, optional, optionalLabel, id, className, disabled, ...rest },
+  { label, prefix, suffix, endAdornment, hint, error, optional, optionalLabel, id, className, disabled, ...rest },
   ref,
 ) {
   const autoId = useId();
@@ -61,7 +62,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             'w-full min-w-0 bg-transparent py-3 text-body text-content-primary outline-none',
             'placeholder:text-content-tertiary disabled:text-content-disabled',
             prefix ? 'ps-0' : 'ps-4',
-            suffix ? 'pe-0' : 'pe-4',
+            suffix || endAdornment ? 'pe-0' : 'pe-4',
           )}
           {...rest}
         />
@@ -70,6 +71,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
             {suffix}
           </span>
         )}
+        {endAdornment && <span className="shrink-0 pe-2">{endAdornment}</span>}
       </div>
     </Field>
   );

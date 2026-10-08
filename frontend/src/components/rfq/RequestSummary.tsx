@@ -30,11 +30,13 @@ export function RequestSummary({
 
   const label = (key: TranslationKey) => t(key);
 
-  const typeLabel = label(
-    ({ ongrid: 's1.ongrid', hybrid: 's1.hybrid', offgrid: 's1.offgrid', unsure: 's1.unsure' } as const)[
-      draft.systemType
-    ],
-  );
+  const typeLabel = draft.systemType
+    ? label(
+        ({ ongrid: 's1.ongrid', hybrid: 's1.hybrid', offgrid: 's1.offgrid', unsure: 's1.unsure' } as const)[
+          draft.systemType
+        ],
+      )
+    : '—';
 
   const propertyLabel = draft.propertyType
     ? label(

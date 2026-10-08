@@ -64,20 +64,6 @@
   --color-sage-600: #4f6141;
   --color-sage-700: #3c4a32;
 
-  /* ===== CHART — categorical energy-mix identity =====
-   * The brand's own primitives (panel/dusk/sage at their UI steps) read too
-   * gray and sit too close in hue to double as a 4-way categorical palette —
-   * validated with the dataviz skill's checker (OKLCH lightness/chroma/CVD),
-   * which is why these are their own step rather than an existing UI token.
-   * Same hex works on both light and dark chart surfaces (checked against
-   * both bands), so one set serves the "current" and "projected" mix cards.
-   * Never reuse these four outside an energy-mix chart; add a new slot
-   * instead of repurposing one, so the identity mapping never drifts. */
-  --chart-grid: #2c7ec6;
-  --chart-generator: #ad5794;
-  --chart-solar: #ad6800;
-  --chart-battery: #00925c;
-
   /* ===== PRIMITIVES — warm neutrals ===== */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #fdfaf6;

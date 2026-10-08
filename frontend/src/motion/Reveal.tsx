@@ -70,25 +70,23 @@ const ITEM_ACTIVE: Variants = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.43, 0.13, 0.23, 0.96] } },
 };
 
-const ITEM_REDUCED: Variants = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.01 } },
-};
-
 /** Child of a `<Reveal stagger>` — rises in sequence with its siblings. */
 export function RevealItem({
   children,
   className,
   as = 'div',
+  variants = ITEM_ACTIVE,
 }: {
   children: ReactNode;
   className?: string;
   as?: RevealTag;
+  variants?: Variants;
 }) {
   const prefersReduced = useReducedMotion();
   const Tag = TAGS[as];
+  const resolved = prefersReduced ? toReducedMotion(variants) : variants;
   return (
-    <Tag className={className} variants={prefersReduced ? ITEM_REDUCED : ITEM_ACTIVE}>
+    <Tag className={className} variants={resolved}>
       {children}
     </Tag>
   );

@@ -3,7 +3,7 @@ import { Icon, type IconName } from '../icons/Icon';
 import { useLanguage } from '../../i18n/LanguageProvider';
 import type { TranslationKey } from '../../i18n/translations';
 
-export type VerificationStatus = 'verified' | 'pending' | 'rejected';
+export type VerificationStatus = 'verified' | 'identity_verified' | 'pending' | 'rejected';
 
 /**
  * Marketplace trust signal.
@@ -18,17 +18,24 @@ const CONFIG: Record<
 > = {
   verified: {
     icon: 'shield-check',
-    label: 'badge.verified',
-    desc: 'badge.verifiedDesc',
+    label: 'badge.gold',
+    desc: 'badge.goldDesc',
     className:
-      'text-[var(--status-success)] bg-[var(--status-success-bg)] border-[var(--status-success)]',
+      'border-amber-500 bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-200 text-amber-950 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_1px_3px_rgba(146,64,14,0.16)]',
+  },
+  identity_verified: {
+    icon: 'shield-check',
+    label: 'badge.silver',
+    desc: 'badge.silverDesc',
+    className:
+      'border-slate-400 bg-gradient-to-r from-slate-100 via-white to-slate-200 text-slate-800 shadow-[inset_0_1px_0_rgba(255,255,255,0.95),0_1px_3px_rgba(51,65,85,0.14)]',
   },
   pending: {
     icon: 'clock',
     label: 'badge.pending',
     desc: 'badge.pendingDesc',
     className:
-      'text-[var(--status-warning)] bg-[var(--status-warning-bg)] border-[var(--status-warning)]',
+      'border-stone-300 bg-gradient-to-r from-stone-100 to-stone-200 text-stone-700',
   },
   rejected: {
     icon: 'x-mark',

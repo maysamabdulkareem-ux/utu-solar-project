@@ -5,6 +5,7 @@ import { RadioCards } from '../ui/RadioCards';
 import { Checkbox } from '../ui/Checkbox';
 import { useLanguage } from '../../i18n/LanguageProvider';
 import { useQuoteRequest, type Timeline } from '../../state/QuoteRequestProvider';
+import { formatIQD } from '../../data/rfq';
 import type { StepErrors } from './validation';
 
 /**
@@ -81,6 +82,74 @@ export function StepPreferences({ errors }: { errors: StepErrors }) {
         />
       </section>
 
+      <section className="rounded-xl border border-line-subtle bg-bg-surface p-5">
+        <h3 className="text-h4 text-content-primary">{t('s3.greenInitiativeTitle')}</h3>
+        <p className="mt-2 max-w-prose text-body-sm text-content-secondary">
+          {t('s3.greenInitiativeDesc')}
+        </p>
+        <Checkbox
+          className="mt-4"
+          label={t('s3.greenInitiativeLabel')}
+          checked={draft.greenInitiative}
+          onChange={(greenInitiative) => update({ greenInitiative })}
+        />
+        {draft.greenInitiative && (
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-1.5 text-label-sm text-content-secondary">
+              {t('s3.greenBudget')}
+              <input
+                aria-label={t('s3.greenBudget')}
+                type="number"
+                min="1"
+                max="10000000000"
+                step="1000"
+                inputMode="numeric"
+                value={draft.greenInitiativeBudgetIqd}
+                onChange={(event) => update({ greenInitiativeBudgetIqd: event.target.value })}
+                aria-invalid={Boolean(errors.greenInitiativeBudgetIqd)}
+                className="min-h-11 rounded-md border border-line bg-bg-surface px-3 text-label text-content-primary"
+              />
+              {errors.greenInitiativeBudgetIqd && (
+                <span className="text-body-sm text-[var(--status-danger)]">
+                  {errors.greenInitiativeBudgetIqd}
+                </span>
+              )}
+            </label>
+            <label className="grid gap-1.5 text-label-sm text-content-secondary">
+              {t('s3.greenRate')}
+              <select
+                aria-label={t('s3.greenRate')}
+                value={draft.greenInitiativeRate}
+                onChange={(event) => update({ greenInitiativeRate: Number(event.target.value) })}
+                className="platform-select"
+              >
+                {[0, 2, 5].map((rate) => (
+                  <option key={rate} value={rate}>{rate}%</option>
+                ))}
+              </select>
+            </label>
+            <div className="rounded-lg bg-bg-subtle p-4 sm:col-span-2" aria-live="polite">
+              <p className="text-label-sm text-content-secondary">{t('s3.greenTerm')}</p>
+              {Number(draft.greenInitiativeBudgetIqd) > 0 ? (
+                <p className="mt-1 text-h4 text-content-primary">
+                  {t('s3.greenMonthly')}: {formatIQD(
+                    calculateGreenMonthlyPayment(
+                      Number(draft.greenInitiativeBudgetIqd),
+                      draft.greenInitiativeRate,
+                    ),
+                  )} IQD
+                </p>
+              ) : (
+                <p className="mt-1 text-body-sm text-content-secondary">{t('s3.greenBudget')}</p>
+              )}
+              <p className="mt-2 text-body-sm text-content-tertiary">
+                {t('s3.greenEstimateDisclaimer')}
+              </p>
+            </div>
+          </div>
+        )}
+      </section>
+
       <Textarea
         label={t('s3.notes')}
         hint={t('s3.notesHint')}
@@ -92,4 +161,12 @@ export function StepPreferences({ errors }: { errors: StepErrors }) {
       />
     </div>
   );
+}
+
+export function calculateGreenMonthlyPayment(principalIqd: number, annualRatePercent: number): number {
+  const months = 60;
+  const monthlyRate = annualRatePercent / 100 / 12;
+  if (!Number.isFinite(principalIqd) || principalIqd <= 0) return 0;
+  if (monthlyRate === 0) return principalIqd / months;
+  return (principalIqd * monthlyRate) / (1 - (1 + monthlyRate) ** -months);
 }

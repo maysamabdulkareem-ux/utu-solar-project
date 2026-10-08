@@ -50,7 +50,12 @@ export function Select({
           disabled={disabled}
           aria-invalid={hasError || undefined}
           aria-describedby={hint || error ? `${selectId}-message` : undefined}
-          className={cn(fieldBoxClass(hasError, disabled), 'appearance-none pe-11')}
+          className={cn(
+            fieldBoxClass(hasError, disabled),
+            'platform-select min-w-0 appearance-none pe-11',
+            hasError && 'border-[var(--status-danger)]',
+            disabled && 'cursor-not-allowed border-line-subtle bg-bg-subtle text-content-disabled',
+          )}
           {...rest}
         >
           {placeholder && <option value="">{placeholder}</option>}

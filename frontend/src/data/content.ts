@@ -24,11 +24,13 @@ export type Company = {
   rating: number;
   reviews: number;
   featured?: boolean;
+  logoUrl?: string;
   name: Localized<string>;
   location: Localized<string>;
   projects: Localized<string>;
   experience: Localized<string>;
   services: Localized<string[]>;
+  supportPhone?: string;
 };
 
 export const companies: Company[] = [
@@ -89,6 +91,27 @@ export type Project = {
   location: Localized<string>;
   installation: Localized<string>;
   company: Localized<string>;
+  description?: Localized<string>;
+  batteryKwh?: number | null;
+  completedAt?: string | null;
+  panelCount?: number | null;
+  roofType?: string | null;
+  inverterDetails?: string | null;
+  annualGenerationKwh?: number | null;
+  galleryUrls?: string[];
+  testimonial?: string | null;
+  clientName?: string | null;
+  companyId?: number;
+  companyLogoUrl?: string | null;
+  companyVerificationStatus?: VerificationStatus;
+  verifiedReview?: VerifiedProjectReview | null;
+};
+
+export type VerifiedProjectReview = {
+  rating: number;
+  client_name: string;
+  comment: string;
+  is_verified: boolean;
 };
 
 export const projects: Project[] = [
@@ -155,7 +178,7 @@ export const steps: Step[] = [
   {
     number: '02',
     icon: 'zap',
-    title: L('Get an AI-Powered Recommendation', 'احصل على توصية بالذكاء الاصطناعي'),
+    title: L('Get a system-size estimate', 'احصل على تقدير لحجم المنظومة'),
     description: L(
       'We turn your loads into a daily figure and size the panels, inverter and battery around it.',
       'نحوّل أحمالك إلى رقم يومي، ونحدّد حوله عدد الألواح وحجم الإنفرتر والبطارية.',
@@ -166,8 +189,8 @@ export const steps: Step[] = [
     icon: 'users',
     title: L('Compare Solar Companies', 'قارن بين شركات الطاقة'),
     description: L(
-      'See verified companies that have built systems like yours, with ratings and real project history.',
-      'اطّلع على شركات موثّقة نفّذت منظومات مثل منظومتك، مع التقييمات وسجل مشاريع حقيقي.',
+      'Compare installers and see whether their business and project evidence has been reviewed.',
+      'قارن الشركات وشوف إذا كانت بياناتها وأدلة مشاريعها قيد التحقق أو مكتملة.',
     ),
   },
   {
@@ -197,8 +220,8 @@ export const trustPoints: TrustPoint[] = [
     icon: 'shield-check',
     title: L('Every company is verified', 'كل شركة موثّقة'),
     description: L(
-      'Trade licence, tax record and at least three completed installations are checked before a company can be listed.',
-      'يُدقَّق الترخيص التجاري والسجل الضريبي وثلاث تركيبات منجزة على الأقل قبل إدراج أي شركة.',
+      'Companies under review are labeled clearly. The verified badge requires a checked trade licence, tax record and three completed projects.',
+      'الشركات قيد التحقق تظهر بشارتها بوضوح. شارة التوثيق تتطلب تدقيق الرخصة والسجل الضريبي وثلاثة مشاريع منجزة.',
     ),
   },
   {
@@ -298,6 +321,14 @@ export type Review = {
   role: Localized<string>;
   body: Localized<string>;
   projectType: Localized<string>;
+  isVerified?: boolean;
+  companyName?: Localized<string>;
+  projectTitle?: Localized<string>;
+  location?: Localized<string>;
+  systemKWp?: number;
+  communicationRating?: number;
+  workQualityRating?: number;
+  createdAt?: string;
 };
 
 export const reviews: Review[] = [
