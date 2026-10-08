@@ -2,6 +2,8 @@ import { useEffect, useState, type FormEvent } from 'react';
 import {
   api,
   ApiError,
+  hasActiveDeposit,
+  isActiveDeposit,
   type AdminRevenueEntry,
   type ApiCompany,
   type ApiProject,
@@ -15,6 +17,7 @@ import { Button } from '../components/ui/Button';
 import { Icon } from '../components/icons/Icon';
 import { Input } from '../components/ui/Input';
 import { RequestChat } from '../components/rfq/RequestChat';
+import { MarkViewedOnScreen } from '../components/rfq/MarkViewedOnScreen';
 import {
   IRAQI_MOBILE_PATTERN,
   isValidIraqiMobile,
@@ -285,12 +288,11 @@ export function CompanyPortalPage() {
     commissionFee: ar ? 'عمولة المنصة (٥٪)' : 'Platform commission (5%)',
     revenueStatus: ar ? 'حالة الدفع والعمولة' : 'Payment & commission status',
     projectTitle: ar ? 'اسم المشروع' : 'Project title',
-    estimatedPrice: ar ? 'تقديري' : 'Estimated',
     acceptedRevenue: ar ? 'مقبول' : 'Accepted',
     completedRevenue: ar ? 'مكتمل' : 'Completed',
     paymentTracking: ar ? 'دفعة العربون' : 'Deposit payment',
     transactionId: ar ? 'رقم المعاملة' : 'Transaction ID',
-    commissionCollected: ar ? 'اقتطعت العمولة تجريبياً' : 'Commission settled (mock)',
+    commissionCollected: ar ? 'عربون تجريبي — لم يُحصَّل أي مبلغ' : 'Demo deposit — nothing collected',
     commissionPending: ar ? 'بانتظار الدفع' : 'Awaiting deposit',
     refundedStatus: ar ? 'تم إرجاع العربون' : 'Refunded',
     refundDeposit: ar ? 'إرجاع العربون' : 'Refund deposit',
@@ -302,8 +304,6 @@ export function CompanyPortalPage() {
     simulatedPaymentNote: ar ? 'الدفع محاكاة تجريبية ولا يتصل بمصرف أو مزود دفع.' : 'Payment is simulated and does not connect to a bank or payment provider.',
     reportsTitle: ar ? 'إدارة البلاغات والمخالفات' : 'Policy Reports & Chat Violations',
     noReports: ar ? 'لا توجد بلاغات أو مخالفات مسجلة.' : 'No policy reports or chat violations have been reported.',
-    sampleReport: ar ? 'بلاغ تجريبي' : 'Sample report',
-    sampleReportStatusNotice: ar ? 'تم تحديث حالة البلاغ التجريبي لهذه الجلسة فقط.' : 'Sample report status updated for this session only.',
     reportPending: ar ? 'قيد الانتظار' : 'Pending',
     reportResolved: ar ? 'تم الحل' : 'Resolved',
     reportDismissed: ar ? 'مرفوض' : 'Dismissed',
@@ -331,6 +331,8 @@ export function CompanyPortalPage() {
     itemizedTotal: ar ? 'مجموع البنود' : 'Itemized total',
     itemizedMismatch: ar ? 'لازم يساوي السعر الكلي مجموع بنود التسعير.' : 'The total price must equal the sum of the itemized costs.',
     verificationRequired: ar ? 'المستوى 0 لا يتيح إرسال العروض. ارفع وثيقة هوية أو مكتب وانتظر مراجعة الإدارة.' : 'Tier 0 cannot submit quotes. Upload an identity or office document and wait for admin review.',
+    phoneAfterDeposit: ar ? 'رقم الزبون يظهر بعد دفع العربون' : 'Phone shown after the customer pays the deposit',
+    quoteLocked: ar ? 'قبل الزبون عرضك، لذلك لا يمكن تعديل السعر أو الشروط.' : 'The customer accepted your quote, so the price and terms can no longer be changed.',
     pendingRequestPrompt: ar
       ? 'لقد استلمت طلب عرض سعر مباشر من زبون! يرجى رفع وثائق الإثبات لتفعيل حسابتك بالكامل وتوقيع العقود.'
       : 'You have received a direct quote request from a customer! Upload verification documents to fully activate your account and become eligible to sign contracts.',
@@ -411,6 +413,11 @@ export function CompanyPortalPage() {
         setVerificationForm({
           projects: String(profile.projects_count ?? 0),
         });
+        // Customer requests open only after identity verification (tier 1+).
+        if (verificationTier(profile.verification_status) < 1) {
+          setRequests([]);
+          return;
+        }
         const inbox = await api.companyInbox(token);
         if (cancelled) return;
         setRequests(inbox);
@@ -732,24 +739,7 @@ export function CompanyPortalPage() {
       setPendingCompanies(companies);
       setAdminProjects(projects);
       setAdminRevenue(revenue);
-      setPolicyReports(reports.length > 0 ? reports : [
-        {
-          id: -1,
-          subject: ar ? 'محاولة مشاركة رقم هاتف في المحادثة' : 'Attempted phone number sharing in chat',
-          description: ar ? 'تم رصد محاولة مشاركة رقم هاتف خارج قنوات التواصل المعتمدة.' : 'A message attempted to share a phone number outside approved contact channels.',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-        {
-          id: -2,
-          subject: ar ? 'اكتشاف رابط خارجي' : 'External link detected',
-          description: ar ? 'تحتوي رسالة على رابط خارجي يحتاج إلى مراجعة الإدارة.' : 'A message contains an external link that requires administrator review.',
-          status: 'pending',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        },
-      ]);
+      setPolicyReports(reports);
       setReviewChecks({});
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Request failed');
@@ -777,14 +767,6 @@ export function CompanyPortalPage() {
     reportId: number,
     status: Exclude<PolicyReport['status'], 'pending'>,
   ) => {
-    if (reportId < 0) {
-      const updatedAt = new Date().toISOString();
-      setPolicyReports((reports) => reports.map((report) => (
-        report.id === reportId ? { ...report, status, updated_at: updatedAt } : report
-      )));
-      setNotice(text.sampleReportStatusNotice);
-      return;
-    }
     setBusy(true);
     setError('');
     try {
@@ -800,7 +782,7 @@ export function CompanyPortalPage() {
   };
 
   const refundAdminDeposit = async (entry: AdminRevenueEntry) => {
-    if (entry.assignment_id == null || entry.payment_status !== 'paid') return;
+    if (entry.assignment_id == null || !isActiveDeposit(entry.payment_status)) return;
     setBusy(true);
     setError('');
     try {
@@ -1150,7 +1132,6 @@ export function CompanyPortalPage() {
                               <td className="py-3 pe-4 text-content-primary">{entry.project_title}</td>
                               <td className="numeric py-3 pe-4 text-content-primary">
                                 {entry.total_agreed_price_iqd.toLocaleString('en-US')} IQD
-                                {entry.is_estimate && <span className="ms-1 text-body-xs text-content-tertiary">({text.estimatedPrice})</span>}
                               </td>
                               <td className="numeric py-3 pe-4 text-content-primary">{entry.commission_fee_iqd.toLocaleString('en-US')} IQD</td>
                               <td className="numeric py-3 pe-4 text-content-primary">
@@ -1158,14 +1139,14 @@ export function CompanyPortalPage() {
                               </td>
                               <td className="py-3 pe-4 text-content-secondary">{entry.transaction_id ?? '—'}</td>
                               <td className="py-3 pe-4 text-content-secondary">
-                                {entry.payment_status === 'paid'
+                                {isActiveDeposit(entry.payment_status)
                                   ? text.commissionCollected
                                   : entry.payment_status === 'refunded'
                                     ? text.refundedStatus
                                     : text.commissionPending}
                               </td>
                               <td className="py-3">
-                                {entry.payment_status === 'paid' && entry.assignment_id != null ? (
+                                {isActiveDeposit(entry.payment_status) && entry.assignment_id != null ? (
                                   <Button variant="secondary" size="md" disabled={busy} onClick={() => { void refundAdminDeposit(entry); }}>
                                     {text.refundDeposit}
                                   </Button>
@@ -1198,7 +1179,6 @@ export function CompanyPortalPage() {
                             <tr key={report.id} className="border-b border-line-subtle last:border-0">
                               <td className="py-3 pe-4 align-top text-content-primary">
                                 {report.subject}
-                                {report.id < 0 && <span className="ms-2 rounded-full bg-bg-subtle px-2 py-1 text-body-xs text-content-tertiary">{text.sampleReport}</span>}
                               </td>
                               <td className="max-w-sm whitespace-pre-wrap py-3 pe-4 align-top text-content-secondary">{report.description}</td>
                               <td className="py-3 pe-4 align-top">
@@ -1414,6 +1394,20 @@ export function CompanyPortalPage() {
                       data-notification-request-id={request.group_id}
                       className="border-y border-line-subtle py-6"
                     >
+                      <MarkViewedOnScreen
+                        enabled={assignmentStatus === 'sent' && Boolean(token)}
+                        onViewed={() => {
+                          void api.markRequestViewed(token, request.group_id).then(() => {
+                            setRequests((current) => current.map((item) => (
+                              item.group_id === request.group_id
+                                ? { ...item, companies: item.companies.map((entry) => (entry.status === 'sent' ? { ...entry, status: 'viewed' } : entry)) }
+                                : item
+                            )));
+                          }).catch(() => {
+                            // Not critical: the request simply stays "sent" until the next view.
+                          });
+                        }}
+                      />
                       <div className="flex flex-wrap justify-between gap-3">
                         <h3 className="text-h4 text-content-primary">{request.group_id}</h3>
                         <span className="text-label-sm text-content-tertiary">{request.companies[0]?.status}</span>
@@ -1424,7 +1418,7 @@ export function CompanyPortalPage() {
                         </span>
                       )}
                       <dl className="mt-3 flex flex-wrap gap-x-8 gap-y-2 text-body-sm">
-                        <div><dt className="text-content-tertiary">{text.customer}</dt><dd className="text-content-primary">{request.customer_name} · {request.customer_phone}</dd></div>
+                        <div><dt className="text-content-tertiary">{text.customer}</dt><dd className="text-content-primary">{request.customer_name} · {request.customer_phone ?? <span className="text-content-tertiary">{text.phoneAfterDeposit}</span>}</dd></div>
                         <div><dt className="text-content-tertiary">{text.system}</dt><dd className="numeric text-content-primary">{request.system_kwp} kWp · {request.battery_kwh} kWh · {request.panel_count} panels</dd></div>
                         {request.details.governorate && <div><dt className="text-content-tertiary">{text.requestLocation}</dt><dd className="text-content-primary">{[request.details.governorate, request.details.district].filter(Boolean).join(' · ')}</dd></div>}
                         {request.details.systemType && <div><dt className="text-content-tertiary">{text.requestSystemType}</dt><dd className="text-content-primary">{request.details.systemType}</dd></div>}
@@ -1451,7 +1445,7 @@ export function CompanyPortalPage() {
                           companyToken={token}
                         />
                       )}
-                      {depositPayment?.payment_status === 'paid' && (
+                      {hasActiveDeposit(depositPayment) && (
                         <aside
                           role="status"
                           data-notification-payment={request.group_id}
@@ -1467,7 +1461,10 @@ export function CompanyPortalPage() {
                           {text.pendingRequestPrompt}
                         </p>
                       )}
-                      {verificationTier(company?.verification_status) >= 1 && !completedProject && !depositPayment && <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => submitQuote(event, request)}>
+                      {assignmentStatus === 'selected' && !completedProject && !depositPayment && (
+                        <p role="note" className="mt-4 rounded-lg border border-line-subtle bg-bg-subtle px-4 py-3 text-body-sm text-content-secondary">{text.quoteLocked}</p>
+                      )}
+                      {verificationTier(company?.verification_status) >= 1 && !completedProject && !depositPayment && assignmentStatus !== 'selected' && <form className="mt-5 grid gap-4 sm:grid-cols-2" onSubmit={(event) => submitQuote(event, request)}>
                         <Input label={text.amount} name="amount" type="number" min="1" required value={values.total ?? quote?.total_iqd ?? ''} onChange={(event) => setQuoteField(request.group_id, 'total', event.target.value)} />
                         <Input label={text.capacity} name="capacity" type="number" min="0.1" step="0.1" required value={values.capacity ?? quote?.capacity_kwp ?? request.system_kwp} onChange={(event) => setQuoteField(request.group_id, 'capacity', event.target.value)} />
                         <Input label={text.panelCost} name="panel_cost" type="number" min="0" step="1" required value={values.panelCost ?? (quote?.panel_iqd ? String(quote.panel_iqd) : '')} onChange={(event) => setQuoteField(request.group_id, 'panelCost', event.target.value)} />

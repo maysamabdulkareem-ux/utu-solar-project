@@ -27,9 +27,9 @@ describe('HomePage payment gateway placement', () => {
     );
 
     const heading = screen.getByRole('heading', {
-      name: 'Supporting Major Local & Regional Payment Gateways',
+      name: 'Deposit methods in the demo',
     });
     expect(heading.closest('main')).toBeInTheDocument();
-    expect(screen.getAllByRole('listitem')).toHaveLength(5);
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 });

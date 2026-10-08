@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react';
-import { api } from '../api/client';
+import { api, hasActiveDeposit } from '../api/client';
 import { useLanguage } from '../i18n/LanguageProvider';
 import { useAuth } from './AuthContext';
 
@@ -33,7 +33,12 @@ type Snapshot = Record<string, string>;
 const NotificationContext = createContext<NotificationValue | null>(null);
 const STORAGE_KEY_PREFIX = 'utu-notifications-v1';
 const SNAPSHOT_KEY_PREFIX = 'utu-notification-snapshot-v1';
-const POLL_INTERVAL_MS = 8000;
+/**
+ * Background check for new activity. Every poll runs several API calls (and
+ * one per open request for chat), so it runs every 45 s and pauses while the
+ * tab is hidden. An open chat polls on its own, faster (see RequestChat).
+ */
+export const POLL_INTERVAL_MS = 45_000;
 
 function safeRead<T>(key: string, fallback: T): T {
   try {
@@ -172,7 +177,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
           }
           nextSnapshot[quoteKey] = quoteSignature;
 
-          const paymentSignature = assignment.payment?.payment_status === 'paid'
+          const paymentSignature = hasActiveDeposit(assignment.payment)
             ? assignment.payment.transaction_id
             : '';
           const paymentKey = `payment:${group.group_id}:${assignment.company_id}`;
@@ -257,10 +262,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
 
     const notifyCompany = async () => {
-      const [profile, inbox] = await Promise.all([
-        api.companyProfile(token),
-        api.companyInbox(token),
-      ]);
+      const profile = await api.companyProfile(token);
+      // Unverified companies cannot read requests; still report their
+      // verification changes instead of failing the whole poll.
+      const canReadInbox = profile.verification_status === 'identity_verified'
+        || profile.verification_status === 'verified';
+      const inbox = canReadInbox ? await api.companyInbox(token) : [];
       const nextSnapshot = { ...snapshotRef.current };
       const verificationKey = `verification:${profile.id}`;
       if (nextSnapshot[verificationKey] !== undefined
@@ -300,7 +307,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
         }
         nextSnapshot[statusKey] = assignment.status;
 
-        const paymentSignature = assignment.payment?.payment_status === 'paid'
+        const paymentSignature = hasActiveDeposit(assignment.payment)
           ? assignment.payment.transaction_id
           : '';
         const paymentKey = `payment:${request.group_id}`;
@@ -399,11 +406,18 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       }
     };
 
+    const pollIfVisible = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      void poll();
+    };
     void poll();
-    const timer = window.setInterval(() => void poll(), POLL_INTERVAL_MS);
+    const timer = window.setInterval(pollIfVisible, POLL_INTERVAL_MS);
+    // Catch up as soon as the person returns to the tab.
+    document.addEventListener('visibilitychange', pollIfVisible);
     return () => {
       active = false;
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', pollIfVisible);
     };
   }, [addNotification, lang, role, snapshotKey, storageKey, token, user, isLoading]);
 

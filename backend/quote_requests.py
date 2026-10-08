@@ -49,10 +49,12 @@ REQUEST_DETAIL_KEYS = {
 }
 DIRECT_FINANCING_MARKER = "\n[[UTU-DIRECT-FINANCING-V1:"
 DIRECT_FINANCING_TERMS = (3, 6, 12, 24)
+MAX_COMPANIES_PER_REQUEST = 3
+ACTIVE_DEPOSIT_STATUSES = {"simulated", "paid"}
 
 
 class QuoteRequestCreate(BaseModel):
-    company_ids: list[int] = PydanticField(min_length=1, max_length=5)
+    company_ids: list[int] = PydanticField(min_length=1, max_length=MAX_COMPANIES_PER_REQUEST)
     customer_name: str = PydanticField(min_length=2, max_length=120)
     customer_phone: str = PydanticField(min_length=11, max_length=11, pattern=r"^07\d{9}$")
     system_kwp: float = PydanticField(gt=0, le=5000)
@@ -247,7 +249,8 @@ class QuoteRequestRead(BaseModel):
     status: str
     created_at: datetime
     customer_name: str
-    customer_phone: str
+    # None when the viewer is a company that has not received a deposit yet.
+    customer_phone: Optional[str]
     system_kwp: float
     battery_kwh: float
     panel_count: int
@@ -414,11 +417,15 @@ def _as_group(session: Session, request: QuoteRequest) -> dict:
         })
 
     status = (
-        "in_progress"
-        if any(company["payment"] and company["payment"]["payment_status"] == "paid" for company in companies)
-        else "completed"
+        "completed"
         if any(
             company["status"] == "selected" and company["completed_projects"]
+            for company in companies
+        )
+        else "in_progress"
+        if any(
+            company["payment"]
+            and company["payment"]["payment_status"] in ACTIVE_DEPOSIT_STATUSES
             for company in companies
         )
         else "accepted"
@@ -759,6 +766,9 @@ def confirm_deposit_payment(
         deposit_iqd=deposit_iqd,
         remaining_iqd=total_iqd - deposit_iqd,
         commission_iqd=round(total_iqd * 0.05),
+        # Demo deposit: no gateway is called, so nothing is marked paid or collected.
+        payment_status="simulated",
+        commission_status="simulated",
     ))
     session.commit()
     return _as_group(session, request)
@@ -789,6 +799,25 @@ def submit_company_quote(
     company = session.get(Company, company_id)
     if company is None or not can_submit_quotes(company.verification_status):
         raise HTTPException(status_code=403, detail="Identity verification is required to submit quotes")
+    # Once the customer has chosen a company, quotes on that request are frozen:
+    # the accepted price cannot change, and other companies cannot re-quote.
+    if assignment.status == "selected":
+        raise HTTPException(
+            status_code=409,
+            detail="This quote was accepted by the customer and can no longer be changed",
+        )
+    other_selected = session.exec(
+        select(QuoteRequestCompany).where(
+            QuoteRequestCompany.request_id == request.id,
+            QuoteRequestCompany.status == "selected",
+            QuoteRequestCompany.company_id != company_id,
+        )
+    ).first()
+    if other_selected is not None:
+        raise HTTPException(
+            status_code=409,
+            detail="The customer has already chosen another company for this request",
+        )
     if payload.green_initiative_supported and not request.is_green_initiative:
         raise HTTPException(
             status_code=422,

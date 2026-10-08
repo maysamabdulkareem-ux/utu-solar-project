@@ -5,7 +5,8 @@ import type { TranslationKey } from '../../i18n/translations';
 export type StepErrors = Partial<Record<keyof QuoteDraft, string>>;
 type Keys = Partial<Record<keyof QuoteDraft, TranslationKey>>;
 
-const MAX_COMPANIES = 4;
+/** Must match MAX_COMPANIES_PER_REQUEST in backend/quote_requests.py. */
+const MAX_COMPANIES = 3;
 export { MAX_COMPANIES };
 
 /**

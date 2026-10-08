@@ -131,13 +131,31 @@ export type AdminRevenueEntry = {
   commission_fee_iqd: number;
   status: 'accepted' | 'completed';
   is_estimate: boolean;
-  payment_status?: 'paid' | 'refunded' | null;
-  commission_status?: 'collected' | 'reversed' | null;
+  payment_status?: DepositPaymentStatus | null;
+  commission_status?: 'simulated' | 'collected' | 'reversed' | null;
   transaction_id?: string | null;
   payment_method?: 'zaincash' | 'fib' | 'qi_card' | null;
   deposit_iqd?: number | null;
   remaining_iqd?: number | null;
 };
+
+/**
+ * Deposits are a demo flow: the backend records them as 'simulated' because
+ * no payment gateway is connected. 'paid' is reserved for a real gateway.
+ */
+export type DepositPaymentStatus = 'simulated' | 'paid' | 'refunded';
+
+/** A deposit that currently holds the booking (demo or real), i.e. not refunded. */
+export function isActiveDeposit(status: DepositPaymentStatus | null | undefined): boolean {
+  return status === 'simulated' || status === 'paid';
+}
+
+/** Same check on a payment object; also tells TypeScript the payment exists. */
+export function hasActiveDeposit<T extends { payment_status: DepositPaymentStatus }>(
+  payment: T | null | undefined,
+): payment is T {
+  return isActiveDeposit(payment?.payment_status);
+}
 
 export type DepositPayment = {
   transaction_id: string;
@@ -146,8 +164,8 @@ export type DepositPayment = {
   deposit_iqd: number;
   remaining_iqd: number;
   commission_iqd: number;
-  payment_status: 'paid' | 'refunded';
-  commission_status: 'collected' | 'reversed';
+  payment_status: DepositPaymentStatus;
+  commission_status: 'simulated' | 'collected' | 'reversed';
   project_status: 'in_progress' | 'cancelled';
   created_at: string;
   refunded_at: string | null;
@@ -729,6 +747,13 @@ export const api = {
       },
     ),
 
+  /** Record that the company opened a request (the inbox read itself changes nothing). */
+  markRequestViewed: (token: string, groupId: string) =>
+    request<{ status: string }>(`/api/company/requests/${encodeURIComponent(groupId)}/viewed`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+    }),
+
   submitCompanyQuote: (token: string, groupId: string, companyId: number, body: CompanyQuoteBody) =>
     request<CompanyQuote>(`/api/quote-requests/${encodeURIComponent(groupId)}/quotes/${companyId}`, {
       method: 'POST',
@@ -844,7 +869,8 @@ export type QuoteRequestGroup = {
   status: 'pending' | 'quotes_received' | 'accepted' | 'in_progress' | 'completed';
   created_at: string;
   customer_name: string;
-  customer_phone: string;
+  /** Null for a company until the customer has placed a deposit with it. */
+  customer_phone: string | null;
   system_kwp: number;
   battery_kwh: number;
   panel_count: number;

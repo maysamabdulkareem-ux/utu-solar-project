@@ -42,6 +42,7 @@ from auth import router as auth_router
 from company_portal import (
     VerificationApplicationUpdate,
     company_requests,
+    mark_request_viewed,
     router as company_portal_router,
     update_verification_application,
 )
@@ -70,6 +71,8 @@ from models import (
 from quote_requests import (
     ChatMessageCreate,
     CompletedInstallation,
+    DepositPaymentCreate,
+    confirm_deposit_payment,
     QuoteCreate,
     QuoteRequestCreate,
     create_quote_request,
@@ -202,6 +205,24 @@ class MarketplaceTests(unittest.TestCase):
                 "test-admin-token",
                 self.session,
             )
+
+    def company_auth(self, email="solar@example.com"):
+        login = login_company(
+            CompanyLogin(email=email, password="a-long-test-password"),
+            self.session,
+        )
+        return f"Bearer {login['access_token']}"
+
+    def simple_quote(self, total_iqd=10_000_000):
+        return QuoteCreate(
+            total_iqd=total_iqd,
+            capacity_kwp=8.4,
+            panel_brand="Panel",
+            inverter_brand="Inverter",
+            battery_brand="Battery",
+            warranty="5 years",
+            install_days=5,
+        )
 
     def request_for(self, company_id):
         return create_quote_request(
@@ -618,6 +639,12 @@ class MarketplaceTests(unittest.TestCase):
                 )
                 self.assertEqual(accepted.status_code, 200)
                 self.assertEqual(accepted.json()["status"], "accepted")
+                inbox_before_deposit = client.get("/api/company/requests", headers=company_headers)
+                self.assertEqual(inbox_before_deposit.status_code, 200)
+                request_before_deposit = next(
+                    item for item in inbox_before_deposit.json() if item["group_id"] == group_id
+                )
+                self.assertIsNone(request_before_deposit["customer_phone"])
                 payment_response = client.post(
                     f"/api/quote-requests/{group_id}/choose/{company_id}/deposit",
                     headers=owner_headers,
@@ -645,14 +672,18 @@ class MarketplaceTests(unittest.TestCase):
                 company_paid_request = next(
                     item for item in company_inbox.json() if item["group_id"] == group_id
                 )
+                # Deposits are a demo flow: recorded as simulated, never as paid.
                 self.assertEqual(
                     company_paid_request["companies"][0]["payment"]["payment_status"],
-                    "paid",
+                    "simulated",
                 )
+                # After the deposit, the company may contact the customer.
+                self.assertEqual(company_paid_request["customer_phone"], "07722223333")
                 with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
                     revenue_rows = admin_revenue("test-admin-token", self.session, None)
                     paid_revenue = next(row for row in revenue_rows if row["request_id"] == persisted_request.id)
-                    self.assertEqual(paid_revenue["commission_status"], "collected")
+                    self.assertEqual(paid_revenue["payment_status"], "simulated")
+                    self.assertEqual(paid_revenue["commission_status"], "simulated")
                     self.assertEqual(paid_revenue["deposit_iqd"], 600_000)
                     refund_result = refund_deposit(
                         paid_revenue["assignment_id"],
@@ -705,7 +736,8 @@ class MarketplaceTests(unittest.TestCase):
                 company_request = next(
                     item for item in company_inbox.json() if item["group_id"] == group_id
                 )
-                self.assertEqual(company_request["customer_phone"], "07722223333")
+                # The deposit was refunded above, so the phone is hidden again.
+                self.assertIsNone(company_request["customer_phone"])
                 self.assertEqual(
                     company_request["details"]["notes"],
                     "Updated after accepting",
@@ -941,7 +973,7 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(accepted["status"], "accepted")
         self.assertFalse(completed["is_estimate"])
 
-    def test_admin_revenue_includes_completed_projects_without_quote_using_estimate(self):
+    def test_admin_revenue_skips_completed_projects_without_an_accepted_quote(self):
         company_result = self.register()
         company_id = company_result["id"]
         project = Project(
@@ -967,11 +999,8 @@ class MarketplaceTests(unittest.TestCase):
 
         rows = admin_revenue(session=self.session, current_user=admin)
 
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["project_title"], "Portfolio completion without quote")
-        self.assertEqual(rows[0]["total_agreed_price_iqd"], 2_500_000)
-        self.assertEqual(rows[0]["commission_fee_iqd"], 125_000)
-        self.assertTrue(rows[0]["is_estimate"])
+        # No accepted quote means no agreed price, so no revenue row is invented.
+        self.assertEqual(rows, [])
 
     def test_user_policy_report_can_be_reviewed_by_admin(self):
         reporter = User(
@@ -1299,6 +1328,12 @@ class MarketplaceTests(unittest.TestCase):
         request = self.request_for(company["id"])
         authorization = f"Bearer {login['access_token']}"
         inbox = company_requests(authorization, self.session)
+        # Reading the inbox (also done by background polling) does not mark
+        # anything as viewed; opening the request does.
+        self.assertEqual(inbox[0]["companies"][0]["status"], "sent")
+        viewed = mark_request_viewed(inbox[0]["group_id"], authorization, self.session)
+        self.assertEqual(viewed["status"], "viewed")
+        inbox = company_requests(authorization, self.session)
         self.assertEqual(inbox[0]["companies"][0]["status"], "viewed")
 
         submit_company_quote(
@@ -1390,7 +1425,7 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json(), [])
 
-    def test_pending_company_receives_selected_request_but_cannot_submit_quote(self):
+    def test_pending_company_cannot_open_inbox_or_submit_quote(self):
         company = self.register()
         visible_companies = {item.id: item for item in get_companies(self.session)}
         self.assertIn(company["id"], visible_companies)
@@ -1401,11 +1436,10 @@ class MarketplaceTests(unittest.TestCase):
         )
         request = self.request_for(company["id"])
         authorization = f"Bearer {login['access_token']}"
-        inbox = company_requests(authorization, self.session)
-        self.assertEqual(len(inbox), 1)
-        self.assertEqual(inbox[0]["group_id"], request["group_id"])
-        self.assertEqual(inbox[0]["customer_name"], "Test Customer")
-        self.assertEqual(inbox[0]["details"]["governorate"], "baghdad")
+        # Unverified companies cannot read customer requests at all.
+        with self.assertRaises(HTTPException) as inbox_error:
+            company_requests(authorization, self.session)
+        self.assertEqual(inbox_error.exception.status_code, 403)
         with self.assertRaises(HTTPException) as error:
             submit_company_quote(
                 request["group_id"],
@@ -1424,7 +1458,7 @@ class MarketplaceTests(unittest.TestCase):
             )
         self.assertEqual(error.exception.status_code, 403)
         result = list_quote_requests(request["access_token"], self.session)[0]
-        self.assertEqual(result["companies"][0]["status"], "viewed")
+        self.assertEqual(result["companies"][0]["status"], "sent")
         self.assertEqual(self.session.get(Company, company["id"]).verification_status, "pending")
 
     def test_customer_can_select_only_a_submitted_quote(self):
@@ -1625,6 +1659,93 @@ class MarketplaceTests(unittest.TestCase):
             CompanyLogin(email="solar@example.com", password="another-long-password"),
             self.session,
         )
+
+
+    def test_quote_is_locked_once_the_customer_accepts(self):
+        first = self.register(email="first@example.com")
+        second = self.register(email="second@example.com")
+        self.approve(first["id"])
+        self.approve(second["id"])
+        request = create_quote_request(
+            QuoteRequestCreate(
+                company_ids=[first["id"], second["id"]],
+                customer_name="Test Customer",
+                customer_phone="07711111111",
+                system_kwp=8.4,
+                battery_kwh=10.2,
+                panel_count=12,
+                details={"governorate": "baghdad"},
+            ),
+            self.session,
+        )
+        first_auth = self.company_auth("first@example.com")
+        second_auth = self.company_auth("second@example.com")
+        submit_company_quote(request["group_id"], first["id"], self.simple_quote(), first_auth, self.session)
+        submit_company_quote(request["group_id"], second["id"], self.simple_quote(9_000_000), second_auth, self.session)
+        choose_company_quote(request["group_id"], first["id"], request["access_token"], self.session)
+
+        with self.assertRaises(HTTPException) as changed_price:
+            submit_company_quote(
+                request["group_id"], first["id"], self.simple_quote(15_000_000), first_auth, self.session
+            )
+        self.assertEqual(changed_price.exception.status_code, 409)
+        with self.assertRaises(HTTPException) as late_competitor:
+            submit_company_quote(
+                request["group_id"], second["id"], self.simple_quote(8_000_000), second_auth, self.session
+            )
+        self.assertEqual(late_competitor.exception.status_code, 409)
+
+        view = list_quote_requests(request["access_token"], self.session)[0]
+        accepted = next(item for item in view["companies"] if item["company_id"] == first["id"])
+        self.assertEqual(accepted["status"], "selected")
+        self.assertEqual(accepted["quote"]["total_iqd"], 10_000_000)
+
+    def test_completed_installation_wins_over_an_active_deposit(self):
+        company = self.register()
+        self.approve(company["id"])
+        authorization = self.company_auth()
+        request = self.request_for(company["id"])
+        submit_company_quote(request["group_id"], company["id"], self.simple_quote(), authorization, self.session)
+        with_deposit = confirm_deposit_payment(
+            request["group_id"],
+            company["id"],
+            DepositPaymentCreate(payment_method="zaincash", phone_number="07711111111"),
+            request["access_token"],
+            self.session,
+            None,
+        )
+        self.assertEqual(with_deposit["status"], "in_progress")
+        self.assertEqual(with_deposit["companies"][0]["payment"]["payment_status"], "simulated")
+        self.assertEqual(with_deposit["companies"][0]["payment"]["commission_status"], "simulated")
+
+        complete_company_installation(
+            request["group_id"],
+            CompletedInstallation(title="Finished system", installation_type="Hybrid rooftop"),
+            authorization,
+            self.session,
+        )
+        finished = list_quote_requests(request["access_token"], self.session)[0]
+        self.assertEqual(finished["status"], "completed")
+
+    def test_a_request_can_go_to_at_most_three_companies(self):
+        with self.assertRaises(ValidationError):
+            QuoteRequestCreate(
+                company_ids=[1, 2, 3, 4],
+                customer_name="Test Customer",
+                customer_phone="07711111111",
+                system_kwp=8.4,
+                battery_kwh=10.2,
+                panel_count=12,
+            )
+        allowed = QuoteRequestCreate(
+            company_ids=[1, 2, 3],
+            customer_name="Test Customer",
+            customer_phone="07711111111",
+            system_kwp=8.4,
+            battery_kwh=10.2,
+            panel_count=12,
+        )
+        self.assertEqual(allowed.company_ids, [1, 2, 3])
 
 
 if __name__ == "__main__":

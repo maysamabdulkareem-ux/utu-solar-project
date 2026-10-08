@@ -12,6 +12,7 @@ type RequestChatProps = {
   companyToken?: string;
 };
 
+const CHAT_POLL_INTERVAL_MS = 4000;
 const FILTERED_MESSAGE = '[تم حجب معلومات التواصل المباشر لحماية الاتفاقية]';
 
 export function RequestChat({
@@ -100,7 +101,11 @@ export function RequestChat({
       }
     };
     void loadMessages();
-    const timer = window.setInterval(() => void loadMessages(), 3000);
+    // Only while this conversation is open, and not while the tab is hidden.
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === 'hidden') return;
+      void loadMessages();
+    }, CHAT_POLL_INTERVAL_MS);
     return () => {
       active = false;
       window.clearInterval(timer);

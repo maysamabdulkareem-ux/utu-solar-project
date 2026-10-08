@@ -100,4 +100,28 @@ describe('AuthContext', () => {
     }));
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('new-jwt');
   });
+
+  it('forgets guest quote requests on this device when signing out', async () => {
+    localStorage.setItem(AUTH_TOKEN_KEY, 'saved-token');
+    localStorage.setItem('utu-request-access', JSON.stringify({ 'UTU-2026-ABCD': 'guest-token' }));
+    localStorage.setItem('utu-quote-requests', JSON.stringify([{ id: 'UTU-2026-ABCD' }]));
+    localStorage.setItem('utu-quote-draft', JSON.stringify({ name: 'Guest' }));
+    localStorage.setItem('utu-quote-step', '2');
+    vi.mocked(api.authMe).mockResolvedValue(user);
+
+    function LogoutButton() {
+      const { logout } = useAuth();
+      return <button onClick={logout}>Logout</button>;
+    }
+    render(<AuthProvider><AuthState /><LogoutButton /></AuthProvider>);
+    await waitFor(() => expect(readState().isAuthenticated).toBe(true));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+
+    expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    expect(localStorage.getItem('utu-request-access')).toBeNull();
+    expect(localStorage.getItem('utu-quote-requests')).toBeNull();
+    expect(localStorage.getItem('utu-quote-draft')).toBeNull();
+    expect(localStorage.getItem('utu-quote-step')).toBeNull();
+  });
 });

@@ -210,6 +210,7 @@ def test_seed_adds_named_companies_and_completed_projects_idempotently(monkeypat
     def create_test_tables():
         SQLModel.metadata.create_all(engine)
 
+    monkeypatch.setattr(seed_module, "DEMO_PASSWORD", "test-demo-password")
     monkeypatch.setattr(seed_module, "engine", engine)
     monkeypatch.setattr(seed_module, "create_db_and_tables", create_test_tables)
     seed_module.seed_companies()

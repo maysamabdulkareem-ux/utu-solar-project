@@ -16,6 +16,7 @@ import {
   type QuoteRequestGroup,
   type QuoteRequestUpdateBody,
 } from '../api/client';
+import { ACCESS_KEY, DRAFT_KEY, QUOTE_STEP_KEY, SENT_KEY } from './requestStorage';
 
 export type SystemType = 'ongrid' | 'hybrid' | 'offgrid' | 'unsure';
 export type PropertyType = 'house' | 'apartment' | 'shop' | 'farm';
@@ -102,10 +103,7 @@ const EMPTY_DRAFT: QuoteDraft = {
   email: '',
 };
 
-const DRAFT_KEY = 'utu-quote-draft';
-const SENT_KEY = 'utu-quote-requests';
-const ACCESS_KEY = 'utu-request-access';
-export const QUOTE_STEP_KEY = 'utu-quote-step';
+export { QUOTE_STEP_KEY };
 
 function loadDraft(): QuoteDraft {
   try {
@@ -248,7 +246,7 @@ function fromGroup(group: QuoteRequestGroup): SubmittedRequest {
       batteryKWh: group.battery_kwh,
       panelCount: group.panel_count,
       name: group.customer_name,
-      phone: group.customer_phone,
+      phone: group.customer_phone ?? '',
       companyIds: group.companies.map((c) => String(c.company_id)),
     },
     statuses: Object.fromEntries(

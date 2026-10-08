@@ -8,7 +8,10 @@ from companies import _password_hash as hash_legacy_company_password
 from models import Company, CompanyCredential, CompanyVerification, Project, Review, User
 from security import hash_password
 
-DEMO_PASSWORD = os.getenv("UTU_DEMO_PASSWORD", "DemoOnly2026!")
+# No built-in default: a password written in the code is public to anyone who
+# can read the repository. seed_companies() refuses to run without one.
+DEMO_PASSWORD = os.getenv("UTU_DEMO_PASSWORD")
+MIN_DEMO_PASSWORD_LENGTH = 10
 
 
 DEMO_COMPANIES = [
@@ -133,6 +136,11 @@ DEMO_REVIEWS = [
 
 
 def seed_companies():
+    if not DEMO_PASSWORD or len(DEMO_PASSWORD) < MIN_DEMO_PASSWORD_LENGTH:
+        raise RuntimeError(
+            "Set UTU_DEMO_PASSWORD (at least 10 characters) before seeding. "
+            "Seed demo data only into a demo database."
+        )
     create_db_and_tables()
 
     with Session(engine) as session:
@@ -294,7 +302,10 @@ def _seed_auth_users(session: Session, companies_by_name: dict[str, Company]) ->
         for user in session.exec(select(User).where(User.company_id.is_not(None))).all()
         if user.company_id is not None
     }
+    demo_company_names = {values["name"] for values in DEMO_COMPANIES}
     for company in companies_by_name.values():
+        if company.name not in demo_company_names:
+            continue
         if company.id in claimed_company_ids:
             continue
         email = (company.email or f"company-{company.id}@solar.iq").strip().lower()
@@ -327,4 +338,7 @@ def _seed_auth_users(session: Session, companies_by_name: dict[str, Company]) ->
 
 
 if __name__ == "__main__":
-    seed_companies()
+    try:
+        seed_companies()
+    except RuntimeError as error:
+        raise SystemExit(str(error))

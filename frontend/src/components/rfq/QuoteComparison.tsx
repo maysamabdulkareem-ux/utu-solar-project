@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import type { DepositPayment } from '../../api/client';
+import { isActiveDeposit, type DepositPayment } from '../../api/client';
 import { cn } from '../../lib/cn';
 import { Icon } from '../icons/Icon';
 import { Button } from '../ui/Button';
@@ -197,7 +197,7 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
                     disabled={Boolean(selectedCompanyId && selectedCompanyId !== q.companyId)}
                     onClick={() => openPaymentOrReceipt(q.companyId)}
                   >
-                    {request.payments?.[q.companyId]?.payment_status === 'paid'
+                    {isActiveDeposit(request.payments?.[q.companyId]?.payment_status)
                       ? (lang === 'ar' ? 'عرض الإيصال' : 'View receipt')
                       : request.payments?.[q.companyId]?.payment_status === 'refunded'
                         ? (lang === 'ar' ? 'تم إرجاع العربون' : 'Deposit refunded')
@@ -256,7 +256,7 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
               disabled={Boolean(selectedCompanyId && selectedCompanyId !== q.companyId)}
               onClick={() => openPaymentOrReceipt(q.companyId)}
             >
-              {request.payments?.[q.companyId]?.payment_status === 'paid'
+              {isActiveDeposit(request.payments?.[q.companyId]?.payment_status)
                 ? (lang === 'ar' ? 'عرض الإيصال' : 'View receipt')
                 : request.payments?.[q.companyId]?.payment_status === 'refunded'
                   ? (lang === 'ar' ? 'تم إرجاع العربون' : 'Deposit refunded')
@@ -290,7 +290,7 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
                   {receipt
                     ? receipt.payment_status === 'refunded'
                       ? (lang === 'ar' ? 'إيصال إرجاع العربون' : 'Deposit refund receipt')
-                      : (lang === 'ar' ? 'إيصال دفع رقمي' : 'Digital payment receipt')
+                      : (lang === 'ar' ? 'إيصال عربون تجريبي' : 'Demo deposit receipt')
                     : (lang === 'ar' ? 'تأكيد الحجز ودفع العربون' : 'Confirm booking & pay deposit')}
                 </h2>
                 <p className="mt-1 text-body-sm text-content-secondary">{nameOf(choosingCompany)}</p>
@@ -302,17 +302,17 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
             {receipt ? (
               <div className="mt-5 space-y-3 rounded-lg border border-line-subtle p-4 text-body-sm text-content-primary">
                 <p><strong>{lang === 'ar' ? 'رقم المعاملة' : 'Transaction ID'}:</strong> {receipt.transaction_id}</p>
-                <p><strong>{lang === 'ar' ? 'المبلغ المدفوع' : 'Amount paid'}:</strong> {formatIQD(receipt.deposit_iqd)} IQD</p>
+                <p><strong>{lang === 'ar' ? 'مبلغ العربون (تجريبي — لم يُخصم شيء)' : 'Deposit amount (demo — nothing was charged)'}:</strong> {formatIQD(receipt.deposit_iqd)} IQD</p>
                 <p><strong>{lang === 'ar' ? 'المبلغ المتبقي' : 'Remaining balance'}:</strong> {formatIQD(receipt.remaining_iqd)} IQD</p>
                 <p><strong>{lang === 'ar' ? 'الحالة' : 'Status'}:</strong> {receipt.payment_status === 'refunded'
                   ? (lang === 'ar' ? 'تم إرجاع العربون وإلغاء المشروع' : 'Deposit refunded; project cancelled')
                   : (lang === 'ar' ? 'قيد التنفيذ' : 'In Progress')}</p>
-                {receipt.payment_status === 'paid' && <a
+                {isActiveDeposit(receipt.payment_status) && <a
                   className="inline-flex rounded-md border border-line-subtle px-4 py-2 text-label text-content-primary hover:bg-bg-subtle"
                   href={`data:text/plain;charset=utf-8,${encodeURIComponent([
-                    'UTU Solar - Digital Payment Receipt',
+                    'UTU Solar - DEMO deposit receipt (no real payment was made)',
                     `Transaction: ${receipt.transaction_id}`,
-                    `Amount paid: ${receipt.deposit_iqd} IQD`,
+                    `Deposit amount (demo): ${receipt.deposit_iqd} IQD`,
                     `Remaining balance: ${receipt.remaining_iqd} IQD`,
                     `Payment method: ${receipt.payment_method}`,
                   ].join('\n'))}`}

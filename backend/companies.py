@@ -145,8 +145,8 @@ class AdminRevenueRead(BaseModel):
     commission_fee_iqd: int
     status: Literal["accepted", "completed"]
     is_estimate: bool
-    payment_status: Optional[Literal["paid", "refunded"]] = None
-    commission_status: Optional[Literal["collected", "reversed"]] = None
+    payment_status: Optional[Literal["simulated", "paid", "refunded"]] = None
+    commission_status: Optional[Literal["simulated", "collected", "reversed"]] = None
     transaction_id: Optional[str] = None
     payment_method: Optional[Literal["zaincash", "fib", "qi_card"]] = None
     deposit_iqd: Optional[int] = None
@@ -303,12 +303,11 @@ def admin_revenue(
             else None
         )
         assignment, _, quote = related_quote if related_quote else (None, None, None)
-        price_is_estimate = quote is None
-        agreed_price = (
-            quote.total_iqd
-            if quote is not None
-            else max(1, round(project.system_kwp * 1_000_000))
-        )
+        if quote is None:
+            # No accepted quote means no agreed price; never invent one.
+            continue
+        price_is_estimate = False
+        agreed_price = quote.total_iqd
         payment = (
             session.exec(
                 select(DepositPayment).where(DepositPayment.assignment_id == assignment.id)

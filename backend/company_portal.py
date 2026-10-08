@@ -7,9 +7,14 @@ from sqlmodel import Session, select
 
 from database import get_session
 from companies import CompanyRead
-from models import Company, CompanyVerification, QuoteRequest, QuoteRequestCompany, User
-from quote_requests import QuoteRequestRead, _as_group, _authenticated_company_id
-from verification import verification_tier
+from models import Company, CompanyVerification, DepositPayment, QuoteRequest, QuoteRequestCompany, User
+from quote_requests import (
+    ACTIVE_DEPOSIT_STATUSES,
+    QuoteRequestRead,
+    _as_group,
+    _authenticated_company_id,
+)
+from verification import can_submit_quotes, verification_tier
 
 router = APIRouter(prefix="/api/company", tags=["Company portal"])
 
@@ -66,6 +71,11 @@ def company_requests(
     company = session.get(Company, company_id)
     if company is None:
         raise HTTPException(status_code=404, detail="Company not found")
+    if not can_submit_quotes(company.verification_status):
+        raise HTTPException(
+            status_code=403,
+            detail="Identity verification is required to access quote requests",
+        )
     assignments = session.exec(
         select(QuoteRequestCompany).where(QuoteRequestCompany.company_id == company_id)
     ).all()
@@ -76,16 +86,62 @@ def company_requests(
             continue
         if is_green_initiative is not None and request.is_green_initiative != is_green_initiative:
             continue
-        if assignment.status == "sent":
-            assignment.status = "viewed"
-            session.add(assignment)
         result = _as_group(session, request)
         result["companies"] = [
             company for company in result["companies"] if company["company_id"] == company_id
         ]
+        # The customer's phone is shared only after the customer has placed a
+        # deposit with this company; until then contact stays on the platform.
+        if not _has_active_deposit(session, assignment.id):
+            result["customer_phone"] = None
         results.append(result)
-    session.commit()
+    # Reading the inbox does not change any status; see mark_request_viewed.
     return sorted(results, key=lambda item: item["created_at"], reverse=True)
+
+
+def _has_active_deposit(session: Session, assignment_id: int) -> bool:
+    payment = session.exec(
+        select(DepositPayment).where(DepositPayment.assignment_id == assignment_id)
+    ).first()
+    return payment is not None and payment.payment_status in ACTIVE_DEPOSIT_STATUSES
+
+
+class RequestViewedRead(BaseModel):
+    status: str
+
+
+@router.post("/requests/{group_id}/viewed", response_model=RequestViewedRead)
+def mark_request_viewed(
+    group_id: str,
+    authorization: Optional[str] = Header(default=None),
+    session: Session = Depends(get_session),
+):
+    """Record that the company actually opened this request."""
+    company_id = _authenticated_company_id(authorization, session)
+    company = session.get(Company, company_id)
+    if company is None or not can_submit_quotes(company.verification_status):
+        raise HTTPException(
+            status_code=403,
+            detail="Identity verification is required to access quote requests",
+        )
+    request = session.exec(select(QuoteRequest).where(QuoteRequest.group_id == group_id)).first()
+    assignment = (
+        session.exec(
+            select(QuoteRequestCompany).where(
+                QuoteRequestCompany.request_id == request.id,
+                QuoteRequestCompany.company_id == company_id,
+            )
+        ).first()
+        if request is not None
+        else None
+    )
+    if assignment is None:
+        raise HTTPException(status_code=404, detail="This request was not sent to your company")
+    if assignment.status == "sent":
+        assignment.status = "viewed"
+        session.add(assignment)
+        session.commit()
+    return {"status": assignment.status}
 
 
 @router.get("/profile", response_model=CompanyProfileRead)

@@ -174,8 +174,10 @@ class DepositPayment(SQLModel, table=True):
     deposit_iqd: int
     remaining_iqd: int
     commission_iqd: int
-    payment_status: str = Field(default="paid", index=True)
-    commission_status: str = Field(default="collected", index=True)
+    # Deposits are a demo flow: no money moves, so rows are "simulated" until a
+    # real payment gateway confirms a charge.
+    payment_status: str = Field(default="simulated", index=True)
+    commission_status: str = Field(default="simulated", index=True)
     project_status: str = Field(default="in_progress", index=True)
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     refunded_at: Optional[datetime] = None

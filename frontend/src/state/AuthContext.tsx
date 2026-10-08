@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from 'react';
 import { api, ApiError, type AuthResponse, type AuthUser, type CompanyRegistrationBody } from '../api/client';
+import { clearDeviceRequestData } from './requestStorage';
 
 export const AUTH_TOKEN_KEY = 'utu-auth-token';
 
@@ -127,6 +128,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = useCallback(() => {
     persistToken('');
+    // Leave nothing behind for the next person on a shared device.
+    clearDeviceRequestData();
     setToken('');
     setUser(null);
   }, []);

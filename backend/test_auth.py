@@ -435,3 +435,63 @@ def test_seed_creates_demo_auth_accounts(monkeypatch, auth_env):
         assert not verify_password("initial-demo-password", admin.hashed_password)
         assert _authenticate("admin@solar.iq", "updated-demo-password", session).role == "admin"
     engine.dispose()
+
+
+def _seed_test_engine(monkeypatch, seed_module):
+    engine = create_engine(
+        "sqlite://",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+
+    def create_test_tables():
+        SQLModel.metadata.create_all(engine)
+
+    monkeypatch.setattr(seed_module, "engine", engine)
+    monkeypatch.setattr(seed_module, "create_db_and_tables", create_test_tables)
+    return engine
+
+
+def test_seed_refuses_to_run_without_a_demo_password(monkeypatch, auth_env):
+    import seed as seed_module
+
+    monkeypatch.setattr(seed_module, "DEMO_PASSWORD", None)
+    engine = _seed_test_engine(monkeypatch, seed_module)
+    with pytest.raises(RuntimeError, match="UTU_DEMO_PASSWORD"):
+        seed_module.seed_companies()
+    monkeypatch.setattr(seed_module, "DEMO_PASSWORD", "short")
+    with pytest.raises(RuntimeError, match="UTU_DEMO_PASSWORD"):
+        seed_module.seed_companies()
+    engine.dispose()
+
+
+def test_seed_never_creates_logins_for_real_companies(monkeypatch, auth_env):
+    import seed as seed_module
+
+    monkeypatch.setattr(seed_module, "DEMO_PASSWORD", "demo-password-for-tests")
+    engine = _seed_test_engine(monkeypatch, seed_module)
+    SQLModel.metadata.create_all(engine)
+    with Session(engine) as session:
+        session.add(Company(
+            name="Real Customer Company",
+            founded_year=2020,
+            phone="07700000099",
+            email="owner@real-company.example",
+            verification_status="verified",
+        ))
+        session.commit()
+
+    seed_module.seed_companies()
+
+    with Session(engine) as session:
+        real_company = session.exec(
+            select(Company).where(Company.name == "Real Customer Company")
+        ).one()
+        linked_users = session.exec(
+            select(User).where(User.company_id == real_company.id)
+        ).all()
+        assert linked_users == []
+        assert session.exec(
+            select(User).where(User.email == "owner@real-company.example")
+        ).first() is None
+    engine.dispose()

@@ -315,7 +315,7 @@ describe('CompanyPortalPage admin requirements', () => {
     })));
   });
 
-  it('shows interactive sample policy reports when the database has no reports', async () => {
+  it('shows an empty state instead of sample reports when the database has no reports', async () => {
     localStorage.clear();
     const admin: AuthUser = {
       id: 1,
@@ -343,15 +343,9 @@ describe('CompanyPortalPage admin requirements', () => {
     );
 
     fireEvent.click(await screen.findByRole('button', { name: 'Load applications' }));
-    expect(await screen.findByText('Attempted phone number sharing in chat')).toBeInTheDocument();
-    expect(screen.getByText('External link detected')).toBeInTheDocument();
-    expect(screen.getAllByText('Sample report')).toHaveLength(2);
-
-    fireEvent.click(screen.getAllByRole('button', { name: 'Resolve' })[0]);
-    expect(await screen.findByText('Sample report status updated for this session only.')).toBeInTheDocument();
-    expect(api.updatePolicyReportStatus).not.toHaveBeenCalled();
-    expect(screen.getByText('Resolved')).toBeInTheDocument();
-    expect(screen.getAllByText('Pending')).toHaveLength(1);
+    expect(await screen.findByText('No policy reports or chat violations have been reported.')).toBeInTheDocument();
+    expect(screen.queryByText('Attempted phone number sharing in chat')).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Resolve' })).not.toBeInTheDocument();
   });
 });
 
@@ -372,15 +366,29 @@ describe('CompanyPortalPage quote marketplace', () => {
     );
   }
 
-  it('lets an unverified company view an assigned request and prompts it to upload verification documents', async () => {
+  it('keeps customer requests closed until the company is identity verified', async () => {
+    vi.mocked(api.companyInbox).mockClear();
     vi.mocked(api.companyInbox).mockResolvedValue([assignedRequest]);
     renderCompanyPortal({ ...pendingCompany, verification_status: 'pending' });
 
-    expect(await screen.findByText('UTU-2026-COMPANY-TEST')).toBeInTheDocument();
-    expect(screen.getByText('Test Customer · 07711111111')).toBeInTheDocument();
-    expect(screen.getByRole('note')).toHaveTextContent(
-      'You have received a direct quote request from a customer! Upload verification documents to fully activate your account and become eligible to sign contracts.',
-    );
+    await waitFor(() => expect(api.companyProfile).toHaveBeenCalled());
+    expect(api.companyInbox).not.toHaveBeenCalled();
+    expect(screen.queryByText('UTU-2026-COMPANY-TEST')).not.toBeInTheDocument();
+    expect(screen.queryByText(/07711111111/)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Send quote' })).not.toBeInTheDocument();
+  });
+
+  it('hides the customer phone until a deposit and locks an accepted quote', async () => {
+    renderCompanyPortal(verifiedCompany, [{
+      ...assignedRequest,
+      customer_phone: null,
+      status: 'accepted',
+      companies: [{ ...assignedRequest.companies[0], status: 'selected' }],
+    }]);
+
+    expect(await screen.findByText('Phone shown after the customer pays the deposit')).toBeInTheDocument();
+    expect(screen.queryByText(/07711111111/)).not.toBeInTheDocument();
+    expect(screen.getByText('The customer accepted your quote, so the price and terms can no longer be changed.')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Send quote' })).not.toBeInTheDocument();
   });
 
@@ -398,8 +406,8 @@ describe('CompanyPortalPage quote marketplace', () => {
           deposit_iqd: 100_000,
           remaining_iqd: 1_900_000,
           commission_iqd: 100_000,
-          payment_status: 'paid',
-          commission_status: 'collected',
+          payment_status: 'simulated',
+          commission_status: 'simulated',
           project_status: 'in_progress',
           created_at: '2026-01-01T00:00:00Z',
           refunded_at: null,

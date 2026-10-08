@@ -3,7 +3,7 @@ import '@testing-library/jest-dom/vitest';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { LanguageProvider } from '../i18n/LanguageProvider';
 import { Header } from '../components/layout/Header';
-import { NotificationsProvider } from './NotificationsContext';
+import { NotificationsProvider, POLL_INTERVAL_MS } from './NotificationsContext';
 
 const { apiMocks, authState } = vi.hoisted(() => ({
   apiMocks: {
@@ -66,7 +66,7 @@ describe('in-app notifications', () => {
 
     const intervalCallbacks: (() => void)[] = [];
     vi.spyOn(window, 'setInterval').mockImplementation((handler, delay) => {
-      if (typeof handler === 'function' && delay === 8000) {
+      if (typeof handler === 'function' && delay === POLL_INTERVAL_MS) {
         intervalCallbacks.push(() => { void (handler as () => void)(); });
       }
       return 1;

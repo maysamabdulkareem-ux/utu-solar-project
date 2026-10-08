@@ -10,7 +10,7 @@ afterEach(() => {
 });
 
 describe('PaymentGateways', () => {
-  it('shows all payment options and the mock-payment disclosure in English', () => {
+  it('shows only the demo deposit methods and the no-real-charge disclosure in English', () => {
     render(
       <LanguageProvider>
         <PaymentGateways />
@@ -18,13 +18,14 @@ describe('PaymentGateways', () => {
     );
 
     expect(screen.getByRole('heading', {
-      name: 'Supporting Major Local & Regional Payment Gateways',
+      name: 'Deposit methods in the demo',
     })).toBeInTheDocument();
     expect(screen.getByText('ZainCash')).toBeInTheDocument();
     expect(screen.getByText('FIB')).toBeInTheDocument();
-    expect(screen.getByText('Qi Card / Mastercard')).toBeInTheDocument();
-    expect(screen.getByText('آسيا حوالة')).toBeInTheDocument();
-    expect(screen.getByText('Visa Card · فيزا كارد')).toBeInTheDocument();
+    expect(screen.getByText('Qi Card')).toBeInTheDocument();
+    // Only methods the backend accepts are listed.
+    expect(screen.queryByText('آسيا حوالة')).not.toBeInTheDocument();
+    expect(screen.queryByText(/Visa/)).not.toBeInTheDocument();
     expect(screen.getByText(/no real bank charge is made/i)).toBeInTheDocument();
   });
 
@@ -36,7 +37,7 @@ describe('PaymentGateways', () => {
       </LanguageProvider>,
     );
     expect(screen.getByRole('heading', {
-      name: 'يدعم أبرز بوابات الدفع العراقية والإقليمية',
+      name: 'طرق دفع العربون في النسخة التجريبية',
     })).toBeInTheDocument();
     expect(screen.getByText('زين كاش')).toBeInTheDocument();
     expect(screen.getByText('المصرف العراقي الأول')).toBeInTheDocument();
