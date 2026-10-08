@@ -151,7 +151,7 @@ def test_company_jwt_opens_existing_company_portal(auth_api):
     assert profile.json()["name"] == "JWT Portal Solar"
 
 
-def test_company_can_update_support_phone_without_changing_verification_or_public_phone(auth_api):
+def test_company_can_update_support_phone_without_changing_verification_or_making_it_public(auth_api):
     client, session = auth_api
     registered = client.post("/api/auth/register/company", json={
         "name": "Support Solar",
@@ -184,8 +184,9 @@ def test_company_can_update_support_phone_without_changing_verification_or_publi
 
     public_directory = client.get("/api/companies")
     public_company = next(item for item in public_directory.json() if item["id"] == company_id)
-    assert public_company["phone"] == "07712345679"
-    assert public_company["support_phone"] == "07812345678"
+    # Even for a verified company, the public directory never shows its numbers.
+    assert public_company["phone"] is None
+    assert public_company["support_phone"] is None
 
     invalid = client.put(
         "/api/company/profile/support-phone",

@@ -873,6 +873,9 @@ export type QuoteRequestGroup = {
     company_id: number;
     company_name: string | null;
     company_verification_status?: string | null;
+    /** Only sent to the customer after a deposit to this company. */
+    company_phone?: string | null;
+    company_support_phone?: string | null;
     status: string;
     green_verification_id?: string | null;
     quote: CompanyQuote | null;

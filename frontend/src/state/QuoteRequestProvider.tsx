@@ -76,7 +76,11 @@ export type SubmittedRequest = {
   completedProjects: CompletedProject[];
   payments?: Record<string, DepositPayment>;
   greenVerificationIds?: Record<string, string>;
+  /** Direct numbers of companies this customer has placed a deposit with. */
+  companyContacts?: Record<string, CompanyContact>;
 };
+
+export type CompanyContact = { phone: string | null; supportPhone: string | null };
 
 const EMPTY_DRAFT: QuoteDraft = {
   systemKWp: 0,
@@ -269,6 +273,16 @@ function fromGroup(group: QuoteRequestGroup): SubmittedRequest {
     payments: Object.fromEntries(
       group.companies.flatMap((company) =>
         company.payment ? [[String(company.company_id), company.payment]] : [],
+      ),
+    ),
+    companyContacts: Object.fromEntries(
+      group.companies.flatMap((company) =>
+        company.company_phone || company.company_support_phone
+          ? [[String(company.company_id), {
+              phone: company.company_phone ?? null,
+              supportPhone: company.company_support_phone ?? null,
+            }]]
+          : [],
       ),
     ),
     greenVerificationIds: Object.fromEntries(

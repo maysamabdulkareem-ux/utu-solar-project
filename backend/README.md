@@ -42,6 +42,7 @@ The default database is `solar.db` in the backend working directory. The fronten
 - `seed.py` creates demo logins for `admin@solar.iq`, `tech@solar.iq`, and `client@solar.iq`. Set `UTU_DEMO_PASSWORD` before seeding; each run updates these demo accounts to that password. Do not seed demo credentials into a production database.
 - API route responses are validated against Pydantic schemas; unexpected server errors are logged and returned as structured JSON without exposing exception details. SQLite connections enable declared foreign-key constraints.
 - Admin endpoints accept only a signed-in admin account. The old shared `UTU_ADMIN_TOKEN` header is no longer supported.
+- Company phone numbers are never in the public company API. A customer receives `company_phone` / `company_support_phone` inside their own request only after an active (simulated) deposit with that company; a refund hides them again. Before that, contact goes through the in-platform chat and UTU support.
 - Deposits are a demo flow: they are stored with status `simulated` (never `paid`) because no payment gateway is connected.
 - `UTU_CORS_ORIGINS` should contain only trusted frontend origins.
 - Company password recovery requires `SMTP_HOST`, `SMTP_PORT` (usually `587`), `SMTP_USERNAME`, `SMTP_PASSWORD`, `SMTP_FROM_EMAIL`, and `PUBLIC_APP_URL`. Use an email provider's SMTP/app password, never a personal mailbox password. Without these settings the reset endpoint returns `503` and no reset email is sent.

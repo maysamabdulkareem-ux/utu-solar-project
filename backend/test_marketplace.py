@@ -663,6 +663,9 @@ class MarketplaceTests(unittest.TestCase):
                 )
                 self.assertEqual(accepted.status_code, 200)
                 self.assertEqual(accepted.json()["status"], "accepted")
+                # Accepting a quote is not enough to see the company's numbers.
+                self.assertIsNone(accepted.json()["companies"][0]["company_phone"])
+                self.assertIsNone(accepted.json()["companies"][0]["company_support_phone"])
                 inbox_before_deposit = client.get("/api/company/requests", headers=company_headers)
                 self.assertEqual(inbox_before_deposit.status_code, 200)
                 request_before_deposit = next(
@@ -678,6 +681,14 @@ class MarketplaceTests(unittest.TestCase):
                 payment_group = payment_response.json()
                 self.assertEqual(payment_group["status"], "in_progress")
                 payment = payment_group["companies"][0]["payment"]
+                # After the deposit, the customer can call this company directly.
+                paid_company = self.session.get(Company, company_id)
+                self.assertIsNotNone(payment_group["companies"][0]["company_phone"])
+                self.assertEqual(payment_group["companies"][0]["company_phone"], paid_company.phone)
+                self.assertEqual(
+                    payment_group["companies"][0]["company_support_phone"],
+                    paid_company.support_phone,
+                )
                 self.assertEqual(payment["payment_method"], "fib")
                 self.assertEqual(payment["deposit_iqd"], 600_000)
                 self.assertEqual(payment["remaining_iqd"], 11_400_000)
@@ -721,6 +732,12 @@ class MarketplaceTests(unittest.TestCase):
                     )
                 ).one()
                 self.assertEqual(stored_payment.project_status, "cancelled")
+                # A refunded deposit hides the company's numbers again.
+                after_refund = next(
+                    item for item in client.get("/api/quote-requests/mine", headers=owner_headers).json()
+                    if item["group_id"] == group_id
+                )
+                self.assertIsNone(after_refund["companies"][0]["company_phone"])
                 verification_id = accepted.json()["companies"][0]["green_verification_id"]
                 self.assertTrue(verification_id)
                 company_verification = self.session.get(CompanyVerification, company_id)
@@ -1188,7 +1205,7 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(reports.status_code, 200)
         self.assertEqual(reports.json(), [])
 
-    def test_public_company_profile_exposes_verified_business_phone_but_not_email(self):
+    def test_public_company_profile_never_exposes_phone_or_email(self):
         company_result = self.register()
         company = self.session.get(Company, company_result["id"])
         public_profile = CompanyPublic.model_validate(
@@ -1202,7 +1219,8 @@ class MarketplaceTests(unittest.TestCase):
 
         self.approve(company.id)
         public_profile = get_company(company.id, self.session)
-        self.assertEqual(public_profile.phone, "07700000000")
+        self.assertIsNone(public_profile.phone)
+        self.assertIsNone(public_profile.support_phone)
 
         project = Project(
             company_id=company.id,
@@ -1221,7 +1239,7 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(public_projects[0]["title"], "Test rooftop installation")
         self.assertEqual(public_projects[0]["location"], "Baghdad · Mansour")
 
-    def test_public_company_directory_includes_phone_only_after_verification(self):
+    def test_public_company_directory_never_includes_phones(self):
         pending_company = self.register(phone="07700000009")
         verified_company = self.register(email="verified@example.com")
         self.approve(verified_company["id"])
@@ -1231,7 +1249,8 @@ class MarketplaceTests(unittest.TestCase):
             for item in get_companies(self.session)
         }
         self.assertIsNone(listed[pending_company["id"]].phone)
-        self.assertEqual(listed[verified_company["id"]].phone, "07700000000")
+        self.assertIsNone(listed[verified_company["id"]].phone)
+        self.assertIsNone(listed[verified_company["id"]].support_phone)
 
     def test_company_cannot_be_verified_without_all_checks_and_three_projects(self):
         company = self.register(projects_count=2)

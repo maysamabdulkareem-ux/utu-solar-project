@@ -218,9 +218,11 @@ def _token_hash(token: str) -> str:
 
 def _public_company(company: Company) -> CompanyPublic:
     public = CompanyPublic.model_validate(company)
-    if company.verification_status not in {"identity_verified", "verified"}:
-        public.phone = None
-        public.support_phone = None
+    # Company numbers are never public. A customer gets them inside their own
+    # request after placing a deposit with that company; until then they talk
+    # through the platform chat and UTU support.
+    public.phone = None
+    public.support_phone = None
     return public
 
 

@@ -236,6 +236,10 @@ class QuoteRequestCompanyRead(BaseModel):
     company_id: int
     company_name: Optional[str]
     company_verification_status: Optional[str] = None
+    # The company's direct numbers, shown to the customer only after a deposit
+    # to this company (mirrors how the company sees the customer's phone).
+    company_phone: Optional[str] = None
+    company_support_phone: Optional[str] = None
     status: str
     green_verification_id: Optional[str] = None
     quote: Optional[QuoteDetailsRead]
@@ -350,6 +354,11 @@ def _as_group(session: Session, request: QuoteRequest) -> dict:
         payment = session.exec(
             select(DepositPayment).where(DepositPayment.assignment_id == assignment.id)
         ).first()
+        contact_unlocked = (
+            company is not None
+            and payment is not None
+            and payment.payment_status in ACTIVE_DEPOSIT_STATUSES
+        )
         completed_projects = session.exec(
             select(Project).where(
                 Project.quote_request_id == request.id,
@@ -362,6 +371,8 @@ def _as_group(session: Session, request: QuoteRequest) -> dict:
             "company_id": assignment.company_id,
             "company_name": company.name if company else None,
             "company_verification_status": company.verification_status if company else None,
+            "company_phone": company.phone if contact_unlocked else None,
+            "company_support_phone": company.support_phone if contact_unlocked else None,
             "status": assignment.status,
             "green_verification_id": assignment.green_verification_id,
             "quote": _serialize_quote(quote) if quote else None,

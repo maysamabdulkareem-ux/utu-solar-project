@@ -6,8 +6,32 @@ import { Button } from '../ui/Button';
 import { useCompanies } from '../../api/useCompanies';
 import { formatIQD } from '../../data/rfq';
 import { useLanguage } from '../../i18n/LanguageProvider';
-import type { SubmittedRequest } from '../../state/QuoteRequestProvider';
+import type { CompanyContact, SubmittedRequest } from '../../state/QuoteRequestProvider';
 import { useQuoteRequest } from '../../state/QuoteRequestProvider';
+
+/**
+ * A company's direct numbers. The server only sends them to the customer
+ * after a deposit with that company, so this renders nothing before that.
+ */
+function CompanyContactLines({ contact, lang }: { contact?: CompanyContact; lang: 'ar' | 'en' }) {
+  if (!contact || (!contact.phone && !contact.supportPhone)) return null;
+  const ar = lang === 'ar';
+  const line = (label: string, number: string) => (
+    <p>
+      {label}:{' '}
+      <a className="text-content-brand underline" href={`tel:${number.replace(/[^\d+]/g, '')}`}>
+        <bdi dir="ltr">{number}</bdi>
+      </a>
+    </p>
+  );
+  return (
+    <div className="mt-3 rounded-lg border border-line-subtle bg-bg-subtle px-3 py-2.5 text-body-sm text-content-secondary">
+      <p className="font-medium text-content-primary">{ar ? 'تواصل مع الشركة مباشرة' : 'Contact the company directly'}</p>
+      {contact.phone && line(ar ? 'الموبايل' : 'Mobile', contact.phone)}
+      {contact.supportPhone && contact.supportPhone !== contact.phone && line(ar ? 'رقم الدعم' : 'Support line', contact.supportPhone)}
+    </div>
+  );
+}
 
 /**
  * Side-by-side quote comparison — the screen the platform exists for.
@@ -206,6 +230,7 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
                           : t('cmp.choose')}
                     <span className="sr-only"> — {nameOf(q.companyId)}</span>
                   </Button>
+                  <CompanyContactLines contact={request.companyContacts?.[q.companyId]} lang={lang} />
                 </td>
               ))}
             </tr>
@@ -265,6 +290,7 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
                     : t('cmp.choose')}
               <span className="sr-only"> — {nameOf(q.companyId)}</span>
             </Button>
+            <CompanyContactLines contact={request.companyContacts?.[q.companyId]} lang={lang} />
           </li>
         ))}
       </ul>
@@ -281,6 +307,11 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
       {selectionError && <p role="alert" className="mt-3 text-body-sm text-[var(--status-danger)]">{selectionError}</p>}
 
       <p className="mt-3 text-label-sm text-content-tertiary">{t('cmp.note')}</p>
+      <p className="mt-1 text-label-sm text-content-tertiary">
+        {lang === 'ar'
+          ? 'أرقام الشركة تظهر لك بعد دفع العربون لها. لحد ذاك تواصل عبر المحادثة داخل المنصة أو دعم UTU.'
+          : "A company's phone numbers appear after you pay it a deposit. Until then, use the in-platform chat or UTU support."}
+      </p>
       {choosingCompany && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/50 p-0 sm:items-center sm:p-4">
           <section role="dialog" aria-modal="true" aria-labelledby="deposit-title" className="max-h-[94vh] w-full max-w-xl overflow-y-auto rounded-t-xl bg-bg-surface p-5 shadow-2xl sm:rounded-xl sm:p-7">
@@ -320,6 +351,9 @@ export function QuoteComparison({ request }: { request: SubmittedRequest }) {
                 >
                   {lang === 'ar' ? 'تنزيل الإيصال' : 'Download receipt'}
                 </a>}
+                {isActiveDeposit(receipt.payment_status) && choosingCompany && (
+                  <CompanyContactLines contact={request.companyContacts?.[choosingCompany]} lang={lang} />
+                )}
               </div>
             ) : (() => {
               const quote = request.quotes[choosingCompany];
