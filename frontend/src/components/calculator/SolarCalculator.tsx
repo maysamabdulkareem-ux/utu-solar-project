@@ -7,10 +7,12 @@ import { ASSUMPTIONS, useSolarEstimate } from './useSolarEstimate';
 import { defaultAppliances, extraAppliances, type Appliance } from '../../data/content';
 import { fmt, useLanguage } from '../../i18n/LanguageProvider';
 import { useQuoteRequest } from '../../state/QuoteRequestProvider';
+import { useAssessment } from '../../state/AssessmentProvider';
+import { estimateToQuoteSystem } from '../../assessment/utuAssessment';
 import { paths } from '../../routes/useHashRoute';
 
 /**
- * The solar load estimate panel.
+ * The smart energy calculator panel.
  *
  * The maths is real (see useSolarEstimate) but the inputs are a demo
  * configuration, so every surface that shows a number also says it is an
@@ -19,7 +21,8 @@ import { paths } from '../../routes/useHashRoute';
  */
 export function SolarCalculator() {
   const { t } = useLanguage();
-  const { reset } = useQuoteRequest();
+  const { startFromSystem } = useQuoteRequest();
+  const { start: startAssessment } = useAssessment();
   const [appliances, setAppliances] = useState<Appliance[]>(defaultAppliances);
   const [activeId, setActiveId] = useState<string>(defaultAppliances[0].id);
   const [calculated, setCalculated] = useState(false);
@@ -42,10 +45,21 @@ export function SolarCalculator() {
 
   const runCalculation = () => setCalculated(true);
 
-  /** Start with a clean request; the calculator remains an optional estimate. */
+  const goTo = (hash: string) => {
+    window.location.hash = hash;
+    window.scrollTo({ top: 0, behavior: 'auto' });
+  };
+
+  /** Send this result to the quote request so nothing is retyped (still editable there). */
   const requestQuotes = () => {
-    reset();
-    window.location.hash = paths.request;
+    startFromSystem(estimateToQuoteSystem(estimate));
+    goTo(paths.request);
+  };
+
+  /** Open the UTU assessment with exactly these appliances. */
+  const openAssessment = () => {
+    startAssessment(appliances);
+    goTo(paths.assessment);
   };
 
   const liveGroups = appliances.filter((a) => a.units > 0 && a.hours > 0).length;
@@ -164,9 +178,14 @@ export function SolarCalculator() {
             <p className="text-label text-content-on-dark">{t('panel.rfqLead')}</p>
             <p className="mt-0.5 text-label-sm text-content-on-dark-muted">{t('panel.rfqNote')}</p>
           </div>
-          <Button onClick={requestQuotes} trailingArrow>
-            {t('panel.rfqCta')}
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button variant="onDark" onClick={openAssessment}>
+              {t('panel.assessCta')}
+            </Button>
+            <Button onClick={requestQuotes} trailingArrow>
+              {t('panel.rfqCta')}
+            </Button>
+          </div>
         </div>
       )}
     </div>

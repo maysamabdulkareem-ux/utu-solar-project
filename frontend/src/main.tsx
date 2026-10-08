@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './App';
 import { LanguageProvider } from './i18n/LanguageProvider';
 import { QuoteRequestProvider } from './state/QuoteRequestProvider';
+import { AssessmentProvider } from './state/AssessmentProvider';
 import { AuthProvider } from './state/AuthContext';
 import { NotificationsProvider } from './state/NotificationsContext';
 import './styles/globals.css';
@@ -13,7 +14,9 @@ createRoot(document.getElementById('root')!).render(
       <AuthProvider>
         <NotificationsProvider>
           <QuoteRequestProvider>
-            <App />
+            <AssessmentProvider>
+              <App />
+            </AssessmentProvider>
           </QuoteRequestProvider>
         </NotificationsProvider>
       </AuthProvider>

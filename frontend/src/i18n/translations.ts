@@ -1,4 +1,5 @@
 import { rfqAr, rfqEn } from './translations.rfq';
+import { assessmentAr, assessmentEn } from './translations.assessment';
 
 /**
  * UI strings, English and Arabic.
@@ -23,7 +24,7 @@ const site = {
   'nav.companies': 'Solar Companies',
   'nav.projects': 'Projects',
   'nav.how': 'How It Works',
-  'nav.calc': 'Solar Calculator',
+  'nav.calc': 'Smart Energy Calculator',
   'cta.signin': 'Sign In',
   'cta.start': 'Get Started',
   'cta.postProject': 'Request a Quote',
@@ -92,14 +93,14 @@ const site = {
     'Compare trusted solar companies, calculate your energy requirements, and find the right solar solution for your home or business.',
   'hero.cta1': 'Calculate My Solar Needs',
   'hero.cta2': 'Explore Solar Solutions',
-  'hero.trust1': 'Installer status shown',
-  'hero.trust2': 'Completed projects',
-  'hero.trust3': 'Average rating',
+  'hero.trust1': 'Verified companies',
+  'hero.trust2': 'Verified customer reviews',
+  'hero.trust3': 'Average verified rating',
   'hero.live': 'Live output today',
   'hero.rec': 'Recommended 8.4 kWp',
   'hero.recSub': '12 panels · 10 kWh battery',
 
-  'calc.pill': 'Solar Load Estimate',
+  'calc.pill': 'Smart Energy Calculator',
   'calc.h2a': 'Tell us what you run.',
   'calc.h2b': 'We size the system.',
   'calc.sub':
@@ -119,7 +120,8 @@ const site = {
   'panel.disclaimer': 'Estimates only — a verified company confirms the final design on site.',
   'panel.rfqLead': 'Happy with this estimate?',
   'panel.rfqCta': 'Request Quotes',
-  'panel.rfqNote': 'Sends this system to the listed companies you choose.',
+  'panel.rfqNote': 'We fill the quote request with this result — you can still edit it. Or see three options in the UTU assessment first.',
+  'panel.assessCta': 'See UTU assessment',
 
   'row.units': 'Units',
   'row.hours': 'Hours / day',
@@ -279,7 +281,7 @@ const site = {
 } as const;
 
 /** Site chrome plus the request-for-quote flow. */
-const en = { ...site, ...rfqEn };
+const en = { ...site, ...rfqEn, ...assessmentEn };
 
 export type TranslationKey = keyof typeof en;
 
@@ -358,14 +360,14 @@ const siteAr: Record<keyof typeof site, string> = {
     'قارن بين شركات الطاقة الشمسية الموثّقة، احسب احتياجك من الطاقة، واختر الحل المناسب لمنزلك أو مشروعك.',
   'hero.cta1': 'احسب احتياجي من الطاقة',
   'hero.cta2': 'تصفّح الحلول الشمسية',
-  'hero.trust1': 'حالة التوثيق واضحة',
-  'hero.trust2': 'مشروع منجز',
-  'hero.trust3': 'متوسط التقييم',
+  'hero.trust1': 'شركة موثّقة',
+  'hero.trust2': 'تقييم زبون موثّق',
+  'hero.trust3': 'متوسط التقييمات الموثّقة',
   'hero.live': 'الإنتاج الحالي اليوم',
   'hero.rec': 'المقترح 8.4 kWp',
   'hero.recSub': '12 لوحًا · بطارية 10 kWh',
 
-  'calc.pill': 'تقدير الأحمال الشمسية',
+  'calc.pill': 'حاسبة الطاقة الذكية',
   'calc.h2a': 'أخبرنا بما تشغّله.',
   'calc.h2b': 'ونحدّد لك حجم المنظومة.',
   'calc.sub':
@@ -385,7 +387,8 @@ const siteAr: Record<keyof typeof site, string> = {
   'panel.disclaimer': 'تقديرات فقط — الشركة الموثّقة تؤكّد التصميم النهائي في الموقع.',
   'panel.rfqLead': 'راضٍ عن هذا التقدير؟',
   'panel.rfqCta': 'اطلب عروض أسعار',
-  'panel.rfqNote': 'يرسل هذه المنظومة إلى الشركات المتاحة التي تختارها.',
+  'panel.rfqNote': 'نملي طلب عرض السعر بهذه النتيجة وتكدر تعدّلها. أو شوف ثلاث خيارات بتقييم UTU أولاً.',
+  'panel.assessCta': 'شوف تقييم UTU',
 
   'row.units': 'العدد',
   'row.hours': 'ساعات/اليوم',
@@ -542,6 +545,6 @@ const siteAr: Record<keyof typeof site, string> = {
   'ft.s3': 'آراء العملاء',
 };
 
-const ar: Record<TranslationKey, string> = { ...siteAr, ...rfqAr };
+const ar: Record<TranslationKey, string> = { ...siteAr, ...rfqAr, ...assessmentAr };
 
 export const translations: Record<Lang, Record<TranslationKey, string>> = { en, ar };

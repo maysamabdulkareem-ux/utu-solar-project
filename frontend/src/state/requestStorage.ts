@@ -9,6 +9,8 @@ export const SENT_KEY = 'utu-quote-requests';
 /** Private access tokens of guest requests, keyed by request group id. */
 export const ACCESS_KEY = 'utu-request-access';
 export const QUOTE_STEP_KEY = 'utu-quote-step';
+/** Appliance list handed from the smart calculator to the UTU assessment. */
+export const ASSESSMENT_KEY = 'utu-assessment-appliances';
 
 /**
  * Forget every quote request this browser knows about.
@@ -19,7 +21,7 @@ export const QUOTE_STEP_KEY = 'utu-quote-step';
  */
 export function clearDeviceRequestData(): void {
   try {
-    for (const key of [DRAFT_KEY, SENT_KEY, ACCESS_KEY, QUOTE_STEP_KEY]) {
+    for (const key of [DRAFT_KEY, SENT_KEY, ACCESS_KEY, QUOTE_STEP_KEY, ASSESSMENT_KEY]) {
       localStorage.removeItem(key);
     }
   } catch {

@@ -3,14 +3,32 @@ import { Button } from '../components/ui/Button';
 import { Icon, type IconName } from '../components/icons/Icon';
 import { fadeInUp, staggerContainer, toReducedMotion } from '../motion/animation';
 import { useReducedMotion } from '../motion/useReducedMotion';
-import { useLanguage } from '../i18n/LanguageProvider';
+import { fmt, useLanguage } from '../i18n/LanguageProvider';
 import type { TranslationKey } from '../i18n/translations';
+import { useCompanies } from '../api/useCompanies';
+import type { Company } from '../data/content';
 
-const TRUST: { value: string; label: TranslationKey; icon: IconName }[] = [
-  { value: '240+', label: 'hero.trust1', icon: 'shield-check' },
-  { value: '1,800+', label: 'hero.trust2', icon: 'solar-panel' },
-  { value: '4.8 / 5', label: 'hero.trust3', icon: 'users' },
-];
+type TrustStat = { value: string; label: TranslationKey; icon: IconName };
+
+/**
+ * Live platform figures, computed from the companies API — never typed-in
+ * marketing numbers. Shows a dash while loading or when the API is down.
+ */
+function trustStats(companies: Company[], ready: boolean): TrustStat[] {
+  const verified = companies.filter((c) => c.status === 'verified');
+  const reviewCount = verified.reduce((sum, c) => sum + c.reviews, 0);
+  const weighted = verified.reduce((sum, c) => sum + c.rating * c.reviews, 0);
+  const dash = '—';
+  return [
+    { value: ready ? fmt.int(verified.length) : dash, label: 'hero.trust1', icon: 'shield-check' },
+    { value: ready ? fmt.int(reviewCount) : dash, label: 'hero.trust2', icon: 'solar-panel' },
+    {
+      value: ready && reviewCount > 0 ? `${fmt.dec(weighted / reviewCount)} / 5` : dash,
+      label: 'hero.trust3',
+      icon: 'users',
+    },
+  ];
+}
 
 /** Twelve-hour output curve; the three amber bars mark solar noon. */
 const SPARK = [14, 22, 34, 48, 62, 74, 80, 72, 58, 40, 26, 16];
@@ -18,6 +36,8 @@ const SPARK = [14, 22, 34, 48, 62, 74, 80, 72, 58, 40, 26, 16];
 export function Hero() {
   const prefersReduced = useReducedMotion();
   const { t } = useLanguage();
+  const { companies, source } = useCompanies();
+  const trust = trustStats(companies, source === 'api');
   const container = prefersReduced ? toReducedMotion(staggerContainer) : staggerContainer;
   const item = prefersReduced ? toReducedMotion(fadeInUp) : fadeInUp;
 
@@ -80,7 +100,7 @@ export function Hero() {
           </motion.div>
 
           <motion.ul variants={item} className="mt-3 flex flex-wrap gap-x-8 gap-y-4">
-            {TRUST.map((s) => (
+            {trust.map((s) => (
               <li key={s.label} className="flex items-center gap-2.5">
                 <span className="grid h-9 w-9 shrink-0 place-items-center rounded-[9px] bg-bg-panel-raised text-solar-300">
                   <Icon name={s.icon} size={16} />

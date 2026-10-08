@@ -17,6 +17,7 @@ import {
   type QuoteRequestUpdateBody,
 } from '../api/client';
 import { ACCESS_KEY, DRAFT_KEY, QUOTE_STEP_KEY, SENT_KEY } from './requestStorage';
+import { MAX_COMPANIES } from '../components/rfq/validation';
 
 export type SystemType = 'ongrid' | 'hybrid' | 'offgrid' | 'unsure';
 export type PropertyType = 'house' | 'apartment' | 'shop' | 'farm';
@@ -104,6 +105,13 @@ const EMPTY_DRAFT: QuoteDraft = {
 };
 
 export { QUOTE_STEP_KEY };
+
+export type CalculatedSystem = {
+  systemKWp: number;
+  batteryKWh: number;
+  panelCount: number;
+  systemType: SystemType;
+};
 
 function loadDraft(): QuoteDraft {
   try {
@@ -277,6 +285,12 @@ type QuoteRequestValue = {
   draft: QuoteDraft;
   update: (patch: Partial<QuoteDraft>) => void;
   reset: () => void;
+  /**
+   * Start a new request pre-filled with a system from the smart calculator or
+   * the UTU assessment (optionally with companies already picked). Contact
+   * details already typed on this device are kept; everything else restarts.
+   */
+  startFromSystem: (system: CalculatedSystem, companyIds?: string[]) => void;
   submit: () => Promise<SubmittedRequest>;
   chooseCompanyQuote: (groupId: string, companyId: string) => Promise<void>;
   confirmDepositPayment: (
@@ -320,6 +334,29 @@ export function QuoteRequestProvider({ children }: { children: ReactNode }) {
   const update = useCallback((patch: Partial<QuoteDraft>) => {
     setDirty(true);
     setDraft((d) => ({ ...d, ...patch }));
+  }, []);
+
+  const startFromSystem = useCallback((system: CalculatedSystem, companyIds: string[] = []) => {
+    setDraft((current) => ({
+      ...EMPTY_DRAFT,
+      name: current.name,
+      phone: current.phone,
+      whatsapp: current.whatsapp,
+      email: current.email,
+      systemKWp: system.systemKWp,
+      batteryKWh: system.batteryKWh,
+      panelCount: system.panelCount,
+      systemType: system.systemType,
+      fromCalculator: true,
+      companyIds: companyIds.slice(0, MAX_COMPANIES),
+    }));
+    setDirty(true);
+    try {
+      // A new request starts at step 1, not wherever the last one stopped.
+      localStorage.removeItem(QUOTE_STEP_KEY);
+    } catch {
+      // ignore
+    }
   }, []);
 
   const reset = useCallback(() => {
@@ -473,8 +510,8 @@ export function QuoteRequestProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<QuoteRequestValue>(
-    () => ({ draft, update, reset, submit, chooseCompanyQuote, confirmDepositPayment, updateRequest, requests, isDirty, refreshFromServer }),
-    [draft, update, reset, submit, chooseCompanyQuote, confirmDepositPayment, updateRequest, requests, isDirty, refreshFromServer],
+    () => ({ draft, update, reset, startFromSystem, submit, chooseCompanyQuote, confirmDepositPayment, updateRequest, requests, isDirty, refreshFromServer }),
+    [draft, update, reset, startFromSystem, submit, chooseCompanyQuote, confirmDepositPayment, updateRequest, requests, isDirty, refreshFromServer],
   );
 
   return <QuoteRequestContext.Provider value={value}>{children}</QuoteRequestContext.Provider>;

@@ -51,7 +51,7 @@ describe('Footer quick links', () => {
     ['Home', '#top'],
     ['Solar Companies', '#companies'],
     ['Projects', '#projects'],
-    ['Solar Calculator', '#calculator'],
+    ['Smart Energy Calculator', '#calculator'],
     ['How It Works', '#how-it-works'],
     ['Services', '#services'],
     ['Request a Quote', '#/rfq'],

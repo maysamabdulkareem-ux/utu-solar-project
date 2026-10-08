@@ -2,6 +2,7 @@ import { lazy, Suspense } from 'react';
 import { HomePage } from './pages/HomePage';
 import { RequestQuotePage } from './pages/RequestQuotePage';
 import { MyRequestsPage } from './pages/MyRequestsPage';
+import { AssessmentPage } from './pages/AssessmentPage';
 import { CompanyPortalPage } from './pages/CompanyPortalPage';
 import { PublicCompanyPage } from './pages/PublicCompanyPage';
 import { CompaniesDirectoryPage } from './pages/CompaniesDirectoryPage';
@@ -36,6 +37,7 @@ export default function App() {
 
       {route === 'request' && <RequestQuotePage />}
       {route === 'requests' && <MyRequestsPage />}
+      {route === 'assessment' && <AssessmentPage />}
       {/* The company portal is its own door: it shows the company sign-in and
           registration screen itself, and turns client accounts away. */}
       {route === 'company' && <CompanyPortalPage />}

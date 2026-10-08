@@ -153,7 +153,7 @@ export function Footer() {
                         className="text-body-sm text-content-on-dark-muted transition-colors hover:text-content-on-dark"
                       >
                         {link === 'ft.l2' ? (isArabic ? 'شركات الطاقة الشمسية' : 'Solar Companies') :
-                          link === 'ft.l4' ? (isArabic ? 'حاسبة الطاقة الشمسية' : 'Solar Calculator') :
+                          link === 'ft.l4' ? (isArabic ? 'حاسبة الطاقة الذكية' : 'Smart Energy Calculator') :
                           link === 'ft.s2' ? (isArabic ? 'اتصل بنا' : 'Contact Us') :
                             t(link)}
                       </a>

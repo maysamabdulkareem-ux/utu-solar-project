@@ -64,6 +64,15 @@
   --color-sage-600: #4f6141;
   --color-sage-700: #3c4a32;
 
+  /* ===== CHART — energy-mix identity (assessment page only) =====
+   * Four separable hues that read on both light and dark chart surfaces.
+   * Used only by the before/after energy-mix bars; add a new slot rather
+   * than repurposing one so the colour-to-source mapping never drifts. */
+  --chart-grid: #2c7ec6;
+  --chart-generator: #ad5794;
+  --chart-solar: #ad6800;
+  --chart-battery: #00925c;
+
   /* ===== PRIMITIVES — warm neutrals ===== */
   --color-neutral-0: #ffffff;
   --color-neutral-50: #fdfaf6;
