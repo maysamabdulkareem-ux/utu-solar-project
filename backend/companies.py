@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import logging
-import os
 import secrets
 import base64
 import binascii
@@ -10,7 +9,6 @@ from typing import List, Literal, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException
 from pydantic import BaseModel, ConfigDict, Field as PydanticField
-from sqlalchemy.exc import IntegrityError
 from sqlmodel import Session, select
 
 from database import get_session
@@ -18,8 +16,6 @@ from email_service import send_password_reset_email, smtp_is_configured
 from models import (
     Company,
     CompanyBase,
-    CompanyCredential,
-    CompanyLoginSession,
     CompanyPasswordResetToken,
     Project,
     CompanyVerification,
@@ -31,7 +27,12 @@ from models import (
     User,
     VerificationDocument,
 )
-from security import get_optional_current_user, hash_password, user_from_token
+from security import (
+    company_id_from_authorization,
+    ensure_admin,
+    get_optional_current_user,
+    hash_password,
+)
 
 router = APIRouter(prefix="/api/companies", tags=["Companies"])
 logger = logging.getLogger(__name__)
@@ -68,24 +69,8 @@ class CompanyProjectRead(BaseModel):
     completed_at: Optional[datetime]
 
 
-class CompanyRegistrationRead(BaseModel):
-    id: int
-    name: str
-    verification_status: str
-
-
-class CompanyLoginRead(BaseModel):
-    access_token: str
-    token_type: Literal["bearer"]
-    company: CompanyRead
-
-
 class MessageRead(BaseModel):
     message: str
-
-
-class LogoutRead(BaseModel):
-    detail: str
 
 
 class CompanyAdminRead(CompanyRead):
@@ -203,11 +188,6 @@ class CompanyVerificationReview(BaseModel):
     rejection_reason: str = PydanticField(default="", max_length=500)
 
 
-class CompanyLogin(BaseModel):
-    email: str = PydanticField(min_length=5, max_length=254)
-    password: str = PydanticField(min_length=1, max_length=128)
-
-
 class PasswordResetRequest(BaseModel):
     email: str = PydanticField(min_length=5, max_length=254)
 
@@ -273,11 +253,10 @@ def create_policy_report(
 
 @router.get("/admin/revenue", response_model=List[AdminRevenueRead])
 def admin_revenue(
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     accepted_quotes = session.exec(
         select(QuoteRequestCompany, Company, CompanyQuote)
         .join(Company, Company.id == QuoteRequestCompany.company_id)
@@ -367,11 +346,10 @@ def admin_revenue(
 @router.post("/admin/revenue/{assignment_id}/refund")
 def refund_deposit(
     assignment_id: int,
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     payment = session.exec(
         select(DepositPayment).where(DepositPayment.assignment_id == assignment_id)
     ).first()
@@ -391,11 +369,10 @@ def refund_deposit(
 
 @router.get("/admin/reports", response_model=List[PolicyReportRead])
 def admin_policy_reports(
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     return session.exec(select(PolicyReport).order_by(PolicyReport.created_at.desc())).all()
 
 
@@ -403,11 +380,10 @@ def admin_policy_reports(
 def update_policy_report_status(
     report_id: int,
     update: PolicyReportStatusUpdate,
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     report = session.get(PolicyReport, report_id)
     if report is None:
         raise HTTPException(status_code=404, detail="Report not found")
@@ -500,11 +476,10 @@ def get_verification_document(
         "license",
         "tax",
     ],
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     document = session.exec(
         select(VerificationDocument).where(
             VerificationDocument.company_id == company_id,
@@ -553,67 +528,6 @@ def get_company_projects(company_id: int, session: Session = Depends(get_session
     ]
 
 
-@router.post("/register", response_model=CompanyRegistrationRead, status_code=201)
-def register_company(payload: CompanyRegistration, session: Session = Depends(get_session)):
-    email = payload.email.strip().lower()
-    if "@" not in email or "." not in email.rsplit("@", 1)[-1]:
-        raise HTTPException(status_code=422, detail="Enter a valid email address")
-    if session.exec(select(CompanyCredential).where(CompanyCredential.email == email)).first():
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
-    if session.exec(select(Company).where(Company.email == email)).first():
-        raise HTTPException(status_code=409, detail="A company with this email is already listed")
-
-    company = Company(
-        name=payload.name.strip(),
-        founded_year=payload.founded_year or 0,
-        projects_count=payload.projects_count,
-        phone=(payload.phone or "").strip(),
-        support_phone=(payload.support_phone or "").strip() or None,
-        email=email,
-        address=(payload.address or "").strip(),
-        verification_status="pending",
-    )
-    session.add(company)
-    session.flush()
-    session.add(CompanyVerification(
-        company_id=company.id,
-        business_license_number=(payload.business_license_number or "").strip(),
-        tax_registration_number=(payload.tax_registration_number or "").strip(),
-    ))
-    session.add(CompanyCredential(
-        company_id=company.id,
-        email=email,
-        password_hash=_password_hash(payload.password),
-    ))
-    try:
-        session.commit()
-    except IntegrityError:
-        session.rollback()
-        raise HTTPException(status_code=409, detail="An account with this email already exists")
-    session.refresh(company)
-    return {"id": company.id, "name": company.name, "verification_status": company.verification_status}
-
-
-@router.post("/login", response_model=CompanyLoginRead)
-def login_company(payload: CompanyLogin, session: Session = Depends(get_session)):
-    email = payload.email.strip().lower()
-    credential = session.exec(
-        select(CompanyCredential).where(CompanyCredential.email == email)
-    ).first()
-    if credential is None or not _verify_password(payload.password, credential.password_hash):
-        raise HTTPException(status_code=401, detail="Email or password is incorrect")
-
-    token = secrets.token_urlsafe(40)
-    session.add(CompanyLoginSession(
-        company_id=credential.company_id,
-        token_hash=_token_hash(token),
-        expires_at=datetime.now(timezone.utc) + timedelta(days=30),
-    ))
-    session.commit()
-    company = session.get(Company, credential.company_id)
-    return {"access_token": token, "token_type": "bearer", "company": CompanyRead.model_validate(company)}
-
-
 @router.post("/password-reset", response_model=MessageRead, status_code=202)
 def request_password_reset(
     payload: PasswordResetRequest,
@@ -624,16 +538,16 @@ def request_password_reset(
 
     generic_response = {"message": "If this email belongs to a company account, reset instructions will be sent."}
     email = payload.email.strip().lower()
-    credential = session.exec(
-        select(CompanyCredential).where(CompanyCredential.email == email)
+    account = session.exec(
+        select(User).where(User.email == email, User.role == "company")
     ).first()
-    if credential is None:
+    if account is None or account.company_id is None or not account.is_active:
         return generic_response
 
     now = datetime.now(timezone.utc)
     recent_reset = session.exec(
         select(CompanyPasswordResetToken).where(
-            CompanyPasswordResetToken.company_id == credential.company_id,
+            CompanyPasswordResetToken.company_id == account.company_id,
             CompanyPasswordResetToken.created_at > now - timedelta(minutes=1),
         )
     ).first()
@@ -642,7 +556,7 @@ def request_password_reset(
 
     token = secrets.token_urlsafe(32)
     reset = CompanyPasswordResetToken(
-        company_id=credential.company_id,
+        company_id=account.company_id,
         token_hash=_token_hash(token),
         expires_at=now + timedelta(minutes=30),
     )
@@ -677,54 +591,27 @@ def confirm_password_reset(
     if expiry <= now:
         raise HTTPException(status_code=400, detail="Password reset link is invalid or expired")
 
-    credential = session.exec(
-        select(CompanyCredential).where(CompanyCredential.company_id == reset.company_id)
+    account = session.exec(
+        select(User).where(User.company_id == reset.company_id, User.role == "company")
     ).first()
-    if credential is None:
+    if account is None:
         raise HTTPException(status_code=400, detail="Password reset link is invalid or expired")
-    credential.password_hash = _password_hash(payload.new_password)
-    linked_user = session.exec(select(User).where(User.company_id == reset.company_id)).first()
-    if linked_user is not None:
-        linked_user.hashed_password = hash_password(payload.new_password)
-        linked_user.token_version += 1
-        session.add(linked_user)
+    account.hashed_password = hash_password(payload.new_password)
+    # Bumping the token version signs out every existing session of this account.
+    account.token_version += 1
     reset.used_at = now
-    sessions = session.exec(
-        select(CompanyLoginSession).where(CompanyLoginSession.company_id == reset.company_id)
-    ).all()
-    for login_session in sessions:
-        session.delete(login_session)
-    session.add(credential)
+    session.add(account)
     session.add(reset)
     session.commit()
     return {"message": "Password updated. Sign in with your new password."}
 
 
-@router.post("/logout", response_model=LogoutRead)
-def logout_company(
-    authorization: Optional[str] = Header(default=None),
-    session: Session = Depends(get_session),
-):
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Company login is required")
-    login_session = session.exec(
-        select(CompanyLoginSession).where(
-            CompanyLoginSession.token_hash == _token_hash(authorization[7:].strip())
-        )
-    ).first()
-    if login_session is not None:
-        session.delete(login_session)
-        session.commit()
-    return {"detail": "Signed out"}
-
-
 @router.get("/admin/pending", response_model=List[CompanyAdminRead])
 def list_pending_companies(
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     pending = session.exec(
         select(Company).where(Company.verification_status.in_(["pending", "identity_verified"]))
     ).all()
@@ -761,11 +648,10 @@ def list_pending_companies(
 def review_company(
     company_id: int,
     review: CompanyVerificationReview,
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     if review.decision not in {"identity_verified", "verified", "rejected"}:
         raise HTTPException(status_code=422, detail="Decision must be verified or rejected")
     company = session.get(Company, company_id)
@@ -836,34 +722,9 @@ def review_company(
     return CompanyRead.model_validate(company)
 
 
-def _require_admin(token: Optional[str], user: Optional[User] = None) -> None:
-    if isinstance(user, User) and user.is_active:
-        if user.role == "admin":
-            return
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
-    expected = os.getenv("UTU_ADMIN_TOKEN")
-    if not expected:
-        raise HTTPException(status_code=503, detail="Admin access is not configured")
-    if token is None or not hmac.compare_digest(token, expected):
-        raise HTTPException(status_code=401, detail="Admin token is invalid")
+def _require_admin(user: Optional[User]) -> None:
+    ensure_admin(user)
 
 
 def _authenticated_company_id(authorization: Optional[str], session: Session) -> int:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Company login is required")
-    token = authorization[7:].strip()
-    legacy_session = session.exec(
-        select(CompanyLoginSession).where(
-            CompanyLoginSession.token_hash == _token_hash(token)
-        )
-    ).first()
-    if legacy_session is not None:
-        expiry = legacy_session.expires_at
-        expiry = expiry.replace(tzinfo=timezone.utc) if expiry.tzinfo is None else expiry
-        if expiry <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=401, detail="Company session expired")
-        return legacy_session.company_id
-    user = user_from_token(token, session)
-    if user.role != "company" or user.company_id is None:
-        raise HTTPException(status_code=403, detail="A company account is required")
-    return user.company_id
+    return company_id_from_authorization(authorization, session)

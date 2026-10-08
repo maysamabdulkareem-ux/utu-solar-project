@@ -117,6 +117,33 @@ def get_optional_current_user(
         return None
 
 
+def company_id_from_authorization(authorization: Optional[str], session: Session) -> int:
+    """The company a request acts for, from the signed-in company user's JWT.
+
+    This is the only way a company authenticates; the old opaque company
+    session tokens are no longer accepted.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        raise HTTPException(status_code=401, detail="Company login is required")
+    user = user_from_token(authorization[7:].strip(), session)
+    if user.role != "company" or user.company_id is None:
+        raise HTTPException(status_code=403, detail="A company account is required")
+    return user.company_id
+
+
+def ensure_admin(user: Optional[User]) -> User:
+    """Admin actions need a signed-in, active admin account (no shared token)."""
+    if not isinstance(user, User):
+        raise HTTPException(
+            status_code=401,
+            detail="Admin login is required",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    if not user.is_active or user.role != "admin":
+        raise HTTPException(status_code=403, detail="Insufficient permissions")
+    return user
+
+
 def require_role(allowed_roles: list[str]):
     def role_dependency(user: User = Depends(get_current_user)) -> User:
         if user.role not in allowed_roles:

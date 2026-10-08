@@ -428,12 +428,6 @@ export type CompanyVerificationReview = {
 
 export type CompanyQuoteBody = CompanyQuote;
 
-export type CompanyLoginResult = {
-  access_token: string;
-  token_type: 'bearer';
-  company: ApiCompany;
-};
-
 export type AuthRole = 'client' | 'company' | 'admin';
 
 export type AuthUser = {
@@ -575,17 +569,16 @@ export const api = {
     return request<ApiProject[]>(`/api/projects${suffix}`);
   },
 
-  createProject: (token: string, body: ProjectCreateBody) =>
+  /** Admin only: uses the signed-in admin's JWT (added by request()). */
+  createProject: (body: ProjectCreateBody) =>
     request<ApiProject>('/api/projects', {
       method: 'POST',
-      headers: { 'X-Admin-Token': token },
       body: JSON.stringify(body),
     }),
 
-  updateProjectStatus: (projectId: number, status: ProjectStatus, legacyAdminToken?: string) =>
+  updateProjectStatus: (projectId: number, status: ProjectStatus) =>
     request<ApiProject>(`/api/projects/${projectId}/status`, {
       method: 'PATCH',
-      headers: legacyAdminToken ? { 'X-Admin-Token': legacyAdminToken } : undefined,
       body: JSON.stringify({ status }),
     }),
 
@@ -683,18 +676,6 @@ export const api = {
       { method: 'POST' },
     ),
 
-  registerCompany: (body: CompanyRegistrationBody) =>
-    request<{ id: number; name: string; verification_status: string }>('/api/companies/register', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    }),
-
-  loginCompany: (email: string, password: string) =>
-    request<CompanyLoginResult>('/api/companies/login', {
-      method: 'POST',
-      body: JSON.stringify({ email, password }),
-    }),
-
   requestCompanyPasswordReset: (email: string) =>
     request<{ message: string }>('/api/companies/password-reset', {
       method: 'POST',
@@ -705,12 +686,6 @@ export const api = {
     request<{ message: string }>('/api/companies/password-reset/confirm', {
       method: 'POST',
       body: JSON.stringify({ token, new_password: newPassword }),
-    }),
-
-  logoutCompany: (token: string) =>
-    request<{ detail: string }>('/api/companies/logout', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${token}` },
     }),
 
   companyProfile: (token: string) =>
@@ -761,10 +736,8 @@ export const api = {
       body: JSON.stringify(body),
     }),
 
-  adminPendingCompanies: (legacyAdminToken?: string) =>
-    request<ApiCompany[]>('/api/companies/admin/pending', {
-      headers: legacyAdminToken ? { 'X-Admin-Token': legacyAdminToken } : undefined,
-    }),
+  adminPendingCompanies: () =>
+    request<ApiCompany[]>('/api/companies/admin/pending'),
 
   adminRevenue: () =>
     request<AdminRevenueEntry[]>('/api/companies/admin/revenue'),
@@ -811,10 +784,9 @@ export const api = {
     });
   },
 
-  reviewCompany: (companyId: number, body: CompanyVerificationReview, legacyAdminToken?: string) =>
+  reviewCompany: (companyId: number, body: CompanyVerificationReview) =>
     request<ApiCompany>(`/api/companies/${companyId}/verification`, {
       method: 'POST',
-      headers: legacyAdminToken ? { 'X-Admin-Token': legacyAdminToken } : undefined,
       body: JSON.stringify(body),
     }),
 

@@ -4,8 +4,7 @@ from datetime import datetime, timezone
 from sqlmodel import Session, select
 
 from database import engine, create_db_and_tables
-from companies import _password_hash as hash_legacy_company_password
-from models import Company, CompanyCredential, CompanyVerification, Project, Review, User
+from models import Company, CompanyVerification, Project, Review, User
 from security import hash_password
 
 # No built-in default: a password written in the code is public to anyone who
@@ -282,21 +281,6 @@ def _seed_auth_users(session: Session, companies_by_name: dict[str, Company]) ->
             user.is_verified = company.verification_status == "verified"
             session.add(user)
 
-        if company is not None:
-            credential = session.exec(
-                select(CompanyCredential).where(CompanyCredential.company_id == company.id)
-            ).first()
-            if credential is None:
-                credential = CompanyCredential(
-                    company_id=company.id,
-                    email=values["email"],
-                    password_hash=hash_legacy_company_password(DEMO_PASSWORD),
-                )
-            else:
-                credential.email = values["email"]
-                credential.password_hash = hash_legacy_company_password(DEMO_PASSWORD)
-            session.add(credential)
-
     claimed_company_ids = {
         user.company_id
         for user in session.exec(select(User).where(User.company_id.is_not(None))).all()
@@ -326,15 +310,6 @@ def _seed_auth_users(session: Session, companies_by_name: dict[str, Company]) ->
             existing.role = "company"
             existing.is_verified = company.verification_status == "verified"
             session.add(existing)
-        credential = session.exec(
-            select(CompanyCredential).where(CompanyCredential.company_id == company.id)
-        ).first()
-        if credential is None:
-            session.add(CompanyCredential(
-                company_id=company.id,
-                email=email,
-                password_hash=hash_legacy_company_password(DEMO_PASSWORD),
-            ))
 
 
 if __name__ == "__main__":

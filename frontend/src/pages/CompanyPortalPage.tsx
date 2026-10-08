@@ -18,12 +18,7 @@ import { Icon } from '../components/icons/Icon';
 import { Input } from '../components/ui/Input';
 import { RequestChat } from '../components/rfq/RequestChat';
 import { MarkViewedOnScreen } from '../components/rfq/MarkViewedOnScreen';
-import {
-  IRAQI_MOBILE_PATTERN,
-  isValidIraqiMobile,
-  isValidSupportPhone,
-  SUPPORT_PHONE_PATTERN,
-} from '../lib/supportPhone';
+import { SUPPORT_PHONE_PATTERN } from '../lib/supportPhone';
 import { Textarea } from '../components/ui/Textarea';
 import { FlowHeader } from '../components/layout/FlowHeader';
 import { useLanguage } from '../i18n/LanguageProvider';
@@ -58,8 +53,8 @@ type CompletionFields = {
   installationType: string;
 };
 
-const TOKEN_KEY = 'utu-company-token';
-type PortalMode = 'login' | 'register' | 'admin' | 'forgot' | 'reset';
+/** Companies and admins sign in through the main account login (AuthModal). */
+type PortalMode = 'portal' | 'admin' | 'forgot' | 'reset';
 type VerificationDocumentFiles = Partial<Record<VerificationDocumentType, File>>;
 
 const IDENTITY_DOCUMENT_TYPES = [
@@ -131,32 +126,16 @@ function CompanyPasswordInput({
   );
 }
 
-function readCompanyToken() {
-  try {
-    return localStorage.getItem(TOKEN_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-function clearCompanyToken() {
-  try {
-    localStorage.removeItem(TOKEN_KEY);
-  } catch {
-    // The in-memory session is still cleared when storage is unavailable.
-  }
-}
-
 export function CompanyPortalPage() {
   const { lang } = useLanguage();
-  const { user, token: authToken, logout: logoutAuth } = useAuth();
+  const { user, token: authToken, logout: logoutAuth, openAuthModal } = useAuth();
   const ar = lang === 'ar';
   const [resetToken, setResetToken] = useState(readPasswordResetToken);
   const [mode, setMode] = useState<PortalMode>(() => (
-    readPasswordResetToken() ? 'reset' : user?.role === 'admin' ? 'admin' : 'login'
+    readPasswordResetToken() ? 'reset' : user?.role === 'admin' ? 'admin' : 'portal'
   ));
   const [token, setToken] = useState(() => (
-    user?.role === 'admin' ? '' : user?.role === 'company' ? authToken || readCompanyToken() : readCompanyToken()
+    user?.role === 'company' ? authToken : ''
   ));
   const [company, setCompany] = useState<ApiCompany | null>(null);
   const [requests, setRequests] = useState<CompanyPortalRequest[]>([]);
@@ -203,17 +182,12 @@ export function CompanyPortalPage() {
       ? (ar ? 'راجع طلبات توثيق الشركات وأدر المشاريع باستخدام صلاحية حساب المسؤول.' : 'Review company verification applications and manage projects using your administrator account.')
       : (ar ? 'سجّل شركتك وتابع طلبات عروض الأسعار المرسلة إليك.' : 'Register your company and respond to quote requests sent to you.'),
     login: ar ? 'تسجيل الدخول' : 'Sign in',
-    register: ar ? 'تسجيل شركة جديدة' : 'Register a company',
     name: ar ? 'اسم الشركة' : 'Company name',
-    founded: ar ? 'سنة التأسيس' : 'Year founded',
     phone: ar ? 'رقم الموبايل الرئيسي' : 'Primary Mobile',
     supportPhone: ar ? 'رقم الدعم السريع للشركة' : 'Company Support Hotline',
     supportPhoneOptional: ar ? 'هاتف الدعم / مركز الاتصال (اختياري)' : 'Support / Call Center Phone (Optional)',
     supportPhoneHelp: ar ? 'مطلوب. أدخل رقم هاتف أو رمز خط الدعم المباشر.' : 'Required. Enter a direct support phone number or hotline code.',
     supportPhoneHelpOptional: ar ? 'اختياري. يقبل موبايل عراقي أو رقم دعم قصير أو خط أرضي.' : 'Optional. Accepts an Iraqi mobile, short support code, or landline.',
-    phoneRequiredMessage: ar ? 'أدخل رقم موبايل عراقي يبدأ بـ 075 أو 077 أو 078.' : 'Enter an Iraqi mobile number starting with 075, 077, or 078.',
-    supportPhoneRequiredMessage: ar ? 'أدخل رقم الدعم السريع للشركة.' : 'Enter the company support hotline.',
-    supportPhoneInvalidMessage: ar ? 'أدخل رقم دعم صالحاً.' : 'Enter a valid support hotline.',
     saveContactPhones: ar ? 'حفظ أرقام التواصل' : 'Save contact numbers',
     supportPhoneSaved: ar ? 'تم حفظ أرقام التواصل.' : 'Company contact numbers saved.',
     email: ar ? 'البريد الإلكتروني' : 'Email address',
@@ -221,11 +195,7 @@ export function CompanyPortalPage() {
     address: ar ? 'المحافظة والعنوان' : 'Governorate and address',
     license: ar ? 'رقم رخصة النشاط' : 'Business license number',
     tax: ar ? 'رقم التسجيل الضريبي' : 'Tax registration number',
-    loginAction: ar ? 'دخول' : 'Sign in',
-    registerAction: ar ? 'إرسال طلب التسجيل' : 'Submit registration',
-    pending: ar
-      ? 'حساب شركتك بانتظار التوثيق. سجّل الدخول وارفع وثيقة هوية أو مكتب لفتح تقديم العروض.'
-      : 'Your company is pending verification. Sign in and upload an identity or office document to unlock quoting.',
+    signInWithAccount: ar ? 'سجّل الدخول بحساب شركتك من زر تسجيل الدخول في أعلى الصفحة.' : 'Sign in with your company account using the Sign in button at the top of the page.',
     inbox: ar ? 'طلبات عروض الأسعار' : 'Quote requests',
     empty: ar ? 'ماكو طلبات مرسلة لشركتك حالياً.' : 'There are no requests for your company yet.',
     logout: ar ? 'تسجيل الخروج' : 'Sign out',
@@ -275,8 +245,6 @@ export function CompanyPortalPage() {
       : 'Quote sent. Wait for the customer to accept your offer before recording the installation as complete.',
     installationCompleted: ar ? 'تم تسجيل التركيب المنجز. يمكن للزبون الآن تقييم المشروع.' : 'Installation recorded. The customer can now review the project.',
     projectCompleted: ar ? 'التركيب مكتمل' : 'Installation completed',
-    switchLogin: ar ? 'عندك حساب؟ سجّل الدخول' : 'Already registered? Sign in',
-    switchRegister: ar ? 'شركة جديدة؟ سجّل شركتك' : 'New company? Register here',
     loadQueue: ar ? 'عرض طلبات التسجيل' : 'Load applications',
     adminAccessNotice: ar
       ? 'أنت مسجل الدخول بحساب مسؤول. تُحمى إجراءات الإدارة بصلاحية حسابك ولا تحتاج إلى إدخال رمز سري منفصل.'
@@ -363,7 +331,6 @@ export function CompanyPortalPage() {
     selectedRequests: ar ? 'تم اختيار الشركة' : 'Company selected',
     noMatchingRequests: ar ? 'ماكو طلبات تطابق البحث أو التصفية.' : 'No requests match these filters.',
     optional: ar ? 'اختياري' : 'Optional',
-    forgotPassword: ar ? 'هل نسيت كلمة المرور؟' : 'Forgot password?',
     recoveryTitle: ar ? 'استعادة كلمة المرور' : 'Password recovery',
     newPassword: ar ? 'كلمة المرور الجديدة' : 'New password',
     confirmPassword: ar ? 'تأكيد كلمة المرور الجديدة' : 'Confirm new password',
@@ -437,9 +404,8 @@ export function CompanyPortalPage() {
       .catch((cause: unknown) => {
         if (cancelled) return;
         if (cause instanceof ApiError && cause.status === 401) {
-          clearCompanyToken();
           setToken('');
-          if (user?.role === 'company' && token === authToken) logoutAuth();
+          logoutAuth();
           setError(ar ? 'انتهت الجلسة. سجّل الدخول مرة ثانية.' : 'Your session expired. Please sign in again.');
           return;
         }
@@ -500,7 +466,7 @@ export function CompanyPortalPage() {
     try {
       if (mode === 'forgot') {
         await api.requestCompanyPasswordReset(String(form.get('email')));
-        setMode('login');
+        setMode('portal');
         setNotice(text.resetRequested);
       } else if (mode === 'reset') {
         const newPassword = String(form.get('new_password'));
@@ -509,55 +475,13 @@ export function CompanyPortalPage() {
           throw new Error(text.passwordsMismatch);
         }
         await api.confirmCompanyPasswordReset(resetToken, newPassword);
-        clearCompanyToken();
+        // The reset signs out every session of the account; sign in again.
         setToken('');
         setResetToken('');
         window.location.hash = '#/company';
-        setMode('login');
         setNotice(text.resetComplete);
-      } else if (mode === 'register') {
-        const foundedYear = String(form.get('founded_year') ?? '').trim();
-        const phone = String(form.get('phone') ?? '').trim();
-        const supportPhone = String(form.get('support_phone') ?? '').trim();
-        if (!isValidIraqiMobile(phone)) {
-          setError(text.phoneRequiredMessage);
-          return;
-        }
-        if (!supportPhone) {
-          setError(text.supportPhoneRequiredMessage);
-          return;
-        }
-        if (!isValidSupportPhone(supportPhone)) {
-          setError(text.supportPhoneInvalidMessage);
-          return;
-        }
-        const address = String(form.get('address') ?? '').trim();
-        const license = String(form.get('business_license_number') ?? '').trim();
-        const taxNumber = String(form.get('tax_registration_number') ?? '').trim();
-        const projects = String(form.get('projects_count') ?? '').trim();
-        await api.registerCompany({
-          name: String(form.get('name')),
-          email: String(form.get('email')),
-          password: String(form.get('password')),
-          founded_year: foundedYear ? Number(foundedYear) : undefined,
-          phone,
-          support_phone: supportPhone,
-          address: address || undefined,
-          business_license_number: license || undefined,
-          tax_registration_number: taxNumber || undefined,
-          projects_count: projects ? Number(projects) : 0,
-        });
-        setMode('login');
-        setNotice(text.pending);
-      } else {
-        const result = await api.loginCompany(String(form.get('email')), String(form.get('password')));
-        try {
-          localStorage.setItem(TOKEN_KEY, result.access_token);
-        } catch {
-          // The session remains active until this page is closed.
-        }
-        setCompany(result.company);
-        setToken(result.access_token);
+        logoutAuth();
+        openAuthModal();
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Request failed';
@@ -878,16 +802,12 @@ export function CompanyPortalPage() {
   const logout = async () => {
     setBusy(true);
     try {
-    if (user?.role === 'company' && token === authToken) logoutAuth();
-    else await api.logoutCompany(token);
-  } catch {
-    // Clear the browser session even if the server is temporarily offline.
+    logoutAuth();
   } finally {
-    clearCompanyToken();
     setToken('');
     setCompany(null);
     setRequests([]);
-    setMode('login');
+    setMode('portal');
     setError('');
     setNotice('');
     setBusy(false);
@@ -951,15 +871,6 @@ export function CompanyPortalPage() {
 
           {!token || mode === 'reset' ? (
             <section className="mt-8 max-w-2xl">
-              {user?.role !== 'admin' && mode !== 'forgot' && mode !== 'reset' && (
-                <div className="mb-6 flex flex-wrap gap-3 border-b border-line-subtle">
-                  {(['login', 'register'] as const).map((tab) => (
-                    <button key={tab} type="button" className={`border-b-2 px-3 py-3 text-label ${mode === tab ? 'border-line-brand text-content-primary' : 'border-transparent text-content-secondary'}`} onClick={() => setMode(tab)}>
-                      {tab === 'login' ? text.login : text.register}
-                    </button>
-                  ))}
-                </div>
-              )}
               {mode === 'admin' ? <>
                 <p className="mb-5 rounded-lg border border-line-subtle bg-bg-subtle px-4 py-3 text-body-sm text-content-secondary">{text.adminAccessNotice}</p>
                 <form className="flex flex-wrap items-end gap-4" onSubmit={loadAdminQueue}>
@@ -1217,43 +1128,14 @@ export function CompanyPortalPage() {
                     <Button type="submit" loading={busy} disabled={mode === 'reset' && !resetToken}>
                       {mode === 'forgot' ? text.sendResetLink : text.resetPassword}
                     </Button>
-                    <button type="button" className="text-label-sm text-content-brand underline" onClick={() => { setMode('login'); setError(''); setNotice(''); }}>
+                    <button type="button" className="text-label-sm text-content-brand underline" onClick={() => { setMode('portal'); setError(''); setNotice(''); }}>
                       {text.backToSignIn}
                     </button>
                   </div>
                 </form>
               </> : <>
-              {mode === 'register' && <p className="mb-5 rounded-lg border border-line-subtle bg-bg-subtle px-4 py-3 text-body-sm text-content-secondary">{text.verificationRule}</p>}
-              <form className="grid gap-5 sm:grid-cols-2" onSubmit={handleAuth}>
-                {mode === 'register' && <>
-                  <Input label={text.name} name="name" autoComplete="organization" required minLength={2} />
-                  <Input label={text.founded} name="founded_year" type="number" min="1900" max={new Date().getFullYear()} optional optionalLabel={text.optional} />
-                  <Input label={ar ? 'رقم الموبايل العراقي' : 'Iraqi Mobile Phone'} name="phone" type="tel" inputMode="numeric" autoComplete="tel" maxLength={11} pattern={IRAQI_MOBILE_PATTERN} placeholder="077 / 078 / 075 XXXXXXXX" title={text.phoneRequiredMessage} required />
-                  <Input label={text.supportPhone} name="support_phone" type="tel" inputMode="tel" autoComplete="off" maxLength={11} pattern={SUPPORT_PHONE_PATTERN} placeholder="07XXXXXXXXX or 6060" title={text.supportPhoneHelp} hint={text.supportPhoneHelp} required />
-                  <Input label={text.address} name="address" autoComplete="street-address" minLength={2} optional optionalLabel={text.optional} />
-                  <Input label={text.license} name="business_license_number" minLength={2} optional optionalLabel={text.optional} />
-                  <Input label={text.tax} name="tax_registration_number" minLength={2} optional optionalLabel={text.optional} />
-                  <Input label={text.projects} name="projects_count" type="number" min="0" max="100000" optional optionalLabel={text.optional} />
-                </>}
-                <Input label={text.email} name="email" type="email" autoComplete="email" required />
-                <CompanyPasswordInput
-                  label={text.password}
-                  name="password"
-                  autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  minLength={mode === 'login' ? 1 : 10}
-                />
-                <div className="flex flex-wrap items-center gap-3 sm:col-span-2">
-                  <Button type="submit" loading={busy}>{mode === 'login' ? text.loginAction : text.registerAction}</Button>
-                  <button type="button" className="text-label-sm text-content-brand underline" onClick={() => { setMode(mode === 'login' ? 'register' : 'login'); setError(''); setNotice(''); }}>
-                    {mode === 'login' ? text.switchRegister : text.switchLogin}
-                  </button>
-                  {mode === 'login' && (
-                    <button type="button" className="text-label-sm text-content-brand underline" onClick={() => { setMode('forgot'); setError(''); setNotice(''); }}>
-                      {text.forgotPassword}
-                    </button>
-                  )}
-                </div>
-              </form>
+                <p role="status" className="rounded-lg border border-line-subtle bg-bg-subtle px-4 py-3 text-body-sm text-content-secondary">{text.signInWithAccount}</p>
+                <Button className="mt-4" onClick={openAuthModal}>{text.login}</Button>
               </>}
             </section>
           ) : (

@@ -251,15 +251,46 @@ def test_company_registration_and_profile_settings_save_both_phone_numbers(auth_
 
 
 @pytest.mark.parametrize("support_phone", ["07712345678", "6060", "6633", "0123456789"])
-def test_legacy_company_registration_accepts_support_phone_formats(auth_api, support_phone):
+def test_company_registration_accepts_support_phone_formats(auth_api, support_phone):
     client, _ = auth_api
-    registered = client.post("/api/companies/register", json={
-        "name": "Legacy Contact Solar",
-        "email": f"legacy-{support_phone}@example.com",
+    registered = client.post("/api/auth/register/company", json={
+        "name": "Contact Solar",
+        "email": f"contact-{support_phone}@example.com",
         "password": "a-long-company-password",
         "support_phone": support_phone,
     })
     assert registered.status_code == 201
+
+
+def test_company_from_the_old_login_system_migrates_on_first_sign_in(auth_api):
+    client, session = auth_api
+    company = Company(
+        name="Old Login Solar",
+        founded_year=2018,
+        projects_count=0,
+        phone="",
+        email="old-login@example.com",
+        verification_status="pending",
+    )
+    session.add(company)
+    session.commit()
+    session.refresh(company)
+    # Accounts made by the removed /api/companies/register only had a credential.
+    session.add(CompanyCredential(
+        company_id=company.id,
+        email="old-login@example.com",
+        password_hash=hash_legacy_company_password("old-company-password"),
+    ))
+    session.commit()
+
+    wrong = client.post("/api/auth/login", json={"email": "old-login@example.com", "password": "not-the-password"})
+    assert wrong.status_code == 401
+    migrated = client.post("/api/auth/login", json={"email": "old-login@example.com", "password": "old-company-password"})
+    assert migrated.status_code == 200
+    assert migrated.json()["user"]["role"] == "company"
+    assert migrated.json()["user"]["company_id"] == company.id
+    user = session.exec(select(User).where(User.email == "old-login@example.com")).one()
+    assert verify_password("old-company-password", user.hashed_password)
 
 
 def test_company_password_reset_revokes_existing_jwt(auth_api):
@@ -283,11 +314,6 @@ def test_company_password_reset_revokes_existing_jwt(auth_api):
         company_id=company.id,
     )
     session.add(user)
-    session.add(CompanyCredential(
-        company_id=company.id,
-        email="reset@example.com",
-        password_hash=hash_legacy_company_password("old-company-password"),
-    ))
     reset_token = "r" * 40
     session.add(CompanyPasswordResetToken(
         company_id=company.id,

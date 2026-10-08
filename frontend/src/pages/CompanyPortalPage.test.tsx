@@ -25,7 +25,6 @@ vi.mock('../api/client', () => ({
     listProjects: vi.fn(),
     updateProjectStatus: vi.fn(),
     companyProfile: vi.fn(),
-    registerCompany: vi.fn(),
     updateCompanySupportPhone: vi.fn(),
     updateCompanyProfileContacts: vi.fn(),
     companyInbox: vi.fn(),
@@ -35,7 +34,6 @@ vi.mock('../api/client', () => ({
     completeCompanyInstallation: vi.fn(),
     updateCompanyVerification: vi.fn(),
     uploadVerificationDocument: vi.fn(),
-    logoutCompany: vi.fn(),
   },
 }));
 
@@ -422,35 +420,6 @@ describe('CompanyPortalPage quote marketplace', () => {
     expect(screen.queryByRole('button', { name: 'Send quote' })).not.toBeInTheDocument();
   });
 
-  it('requires an Iraqi mobile and accepts a short support code in company registration', async () => {
-    vi.mocked(api.registerCompany).mockResolvedValue({
-      id: 9,
-      name: 'Code Solar',
-      verification_status: 'pending',
-    });
-    renderCompanyPortal();
-
-    fireEvent.click(screen.getByRole('button', { name: 'New company? Register here' }));
-    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Code Solar' } });
-    const primaryPhone = screen.getByLabelText('Iraqi Mobile Phone');
-    expect(primaryPhone).toBeRequired();
-    fireEvent.change(primaryPhone, { target: { value: '07712345678' } });
-    const supportPhone = screen.getByLabelText('Company Support Hotline');
-    expect(supportPhone).toBeRequired();
-    expect(supportPhone).toHaveAttribute('placeholder', '07XXXXXXXXX or 6060');
-    fireEvent.change(supportPhone, { target: { value: '6633' } });
-    expect(supportPhone).toBeValid();
-    fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'code@example.com' } });
-    fireEvent.change(screen.getByLabelText('Password (at least 10 characters)'), { target: { value: 'a-long-company-password' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Submit registration' }));
-
-    await waitFor(() => expect(api.registerCompany).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'Code Solar',
-      phone: '07712345678',
-      support_phone: '6633',
-    })));
-  });
-
   it('shows request specifications, filters the inbox, and submits a matching itemized quote', async () => {
     vi.mocked(api.chatMessages).mockResolvedValue([]);
     vi.mocked(api.submitCompanyQuote).mockResolvedValue({
@@ -616,11 +585,11 @@ describe('CompanyPortalPage quote marketplace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
-    expect(await screen.findAllByRole('button', { name: 'Sign in' })).toHaveLength(2);
+    // Signing in again happens through the main account login.
+    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByText('Verification details sent for admin review.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Admin review' })).not.toBeInTheDocument();
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
-    expect(api.logoutCompany).not.toHaveBeenCalled();
   });
 
   it('uploads selected verification evidence with the company application', async () => {

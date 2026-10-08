@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timezone
 from typing import Literal, Optional
 
-from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import Session, select
 
@@ -153,11 +153,10 @@ def get_project(project_id: int, session: Session = Depends(get_session)):
 @router.post("", response_model=ProjectRead, status_code=201)
 def create_project(
     payload: ProjectCreate,
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     company = session.get(Company, payload.company_id)
     if company is None or company.verification_status == "rejected":
         raise HTTPException(status_code=422, detail="A listed company is required")
@@ -188,11 +187,10 @@ def create_project(
 def update_project_status(
     project_id: int,
     payload: ProjectStatusUpdate,
-    x_admin_token: Optional[str] = Header(default=None),
     session: Session = Depends(get_session),
     current_user: Optional[User] = Depends(get_optional_current_user),
 ):
-    _require_admin(x_admin_token, current_user)
+    _require_admin(current_user)
     project, company = _get_project_and_company(project_id, session)
     previous_status = project.status
     project.status = payload.status

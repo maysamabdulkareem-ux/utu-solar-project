@@ -7,8 +7,25 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
 from database import get_session
-from models import Company, Project, Review
+from models import Company, Project, Review, User
 from projects import router
+from security import create_access_token
+
+
+def _admin_headers(session, monkeypatch):
+    """Admin actions need a signed-in admin account; the shared token is gone."""
+    monkeypatch.setenv("JWT_SECRET_KEY", "project-test-secret-key-that-is-long-enough")
+    admin = User(
+        email="project-admin@example.com",
+        hashed_password="not-used",
+        full_name="Project Admin",
+        role="admin",
+        is_active=True,
+    )
+    session.add(admin)
+    session.commit()
+    session.refresh(admin)
+    return {"Authorization": f"Bearer {create_access_token(admin)}"}
 
 
 @pytest.fixture
@@ -104,11 +121,10 @@ def test_completed_projects_feed_returns_older_projects_after_new_ones(project_a
 
 
 def test_admin_can_complete_project_and_completed_feed_includes_it(project_api, monkeypatch):
-    client, _, _, project = project_api
-    monkeypatch.setenv("UTU_ADMIN_TOKEN", "test-admin-token")
+    client, session, _, project = project_api
     updated = client.patch(
         f"/api/projects/{project.id}/status",
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=_admin_headers(session, monkeypatch),
         json={"status": "completed"},
     )
     assert updated.status_code == 200
@@ -118,19 +134,24 @@ def test_admin_can_complete_project_and_completed_feed_includes_it(project_api, 
     assert [item["id"] for item in feed.json()] == [project.id]
 
 
-def test_project_status_update_requires_admin_token(project_api, monkeypatch):
+def test_project_status_update_requires_an_admin_account(project_api, monkeypatch):
     client, _, _, project = project_api
-    monkeypatch.setenv("UTU_ADMIN_TOKEN", "test-admin-token")
-    response = client.patch(
+    monkeypatch.setenv("UTU_ADMIN_TOKEN", "old-shared-admin-token")
+    anonymous = client.patch(
         f"/api/projects/{project.id}/status",
         json={"status": "completed"},
     )
-    assert response.status_code == 401
+    assert anonymous.status_code == 401
+    shared_token = client.patch(
+        f"/api/projects/{project.id}/status",
+        headers={"X-Admin-Token": "old-shared-admin-token"},
+        json={"status": "completed"},
+    )
+    assert shared_token.status_code == 401
 
 
 def test_admin_can_create_completed_project_with_gallery(project_api, monkeypatch):
-    client, _, company, _ = project_api
-    monkeypatch.setenv("UTU_ADMIN_TOKEN", "test-admin-token")
+    client, session, company, _ = project_api
     payload = {
         "title": "New completed installation",
         "company_id": company.id,
@@ -143,7 +164,7 @@ def test_admin_can_create_completed_project_with_gallery(project_api, monkeypatc
     }
     response = client.post(
         "/api/projects",
-        headers={"X-Admin-Token": "test-admin-token"},
+        headers=_admin_headers(session, monkeypatch),
         json=payload,
     )
     assert response.status_code == 201

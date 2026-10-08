@@ -190,13 +190,6 @@ class CompanyCredential(SQLModel, table=True):
     password_hash: str
 
 
-class CompanyLoginSession(SQLModel, table=True):
-    id: Optional[int] = Field(default=None, primary_key=True)
-    company_id: int = Field(foreign_key="company.id", index=True)
-    token_hash: str = Field(unique=True, index=True)
-    expires_at: datetime
-
-
 class User(SQLModel, table=True):
     id: Optional[int] = Field(default=None, primary_key=True)
     email: str = Field(unique=True, index=True)

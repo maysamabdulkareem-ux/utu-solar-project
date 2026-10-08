@@ -9,7 +9,6 @@ from sqlmodel import Session, select
 
 from companies import (
     CompanyRegistration,
-    _password_hash as hash_legacy_company_password,
     _verify_password as verify_legacy_company_password,
 )
 from database import get_session
@@ -130,11 +129,6 @@ def register_company_user(payload: CompanyRegistration, session: Session = Depen
         business_license_number=(payload.business_license_number or "").strip(),
         tax_registration_number=(payload.tax_registration_number or "").strip(),
     ))
-    session.add(CompanyCredential(
-        company_id=company.id,
-        email=email,
-        password_hash=hash_legacy_company_password(payload.password),
-    ))
     session.add(user)
     try:
         session.commit()
@@ -146,6 +140,12 @@ def register_company_user(payload: CompanyRegistration, session: Session = Depen
 
 
 def _upgrade_legacy_company_login(email: str, password: str, session: Session) -> Optional[User]:
+    """One-time migration for companies created by the old company login.
+
+    The old system stored company passwords in CompanyCredential. On the first
+    sign-in with the correct password, a normal company User account is created
+    and used from then on. New accounts never get a CompanyCredential.
+    """
     credential = session.exec(
         select(CompanyCredential).where(CompanyCredential.email == email)
     ).first()

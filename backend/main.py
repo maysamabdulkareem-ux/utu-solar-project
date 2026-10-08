@@ -47,7 +47,7 @@ app.add_middleware(
         if origin.strip()
     ],
     allow_methods=["GET", "POST", "PUT", "PATCH", "OPTIONS"],
-    allow_headers=["*", "authorization", "x-admin-token"],
+    allow_headers=["*", "authorization"],
 )
 
 app.include_router(router)

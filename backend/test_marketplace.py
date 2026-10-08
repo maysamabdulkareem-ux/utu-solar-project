@@ -11,7 +11,6 @@ from sqlmodel import Session, SQLModel, create_engine, select
 from sqlmodel.pool import StaticPool
 
 from companies import (
-    CompanyLogin,
     CompanyPublic,
     CompanyRegistration,
     CompanyVerificationReview,
@@ -26,19 +25,16 @@ from companies import (
     get_companies,
     get_company,
     get_company_projects,
-    login_company,
-    logout_company,
     PasswordResetConfirm,
     PasswordResetRequest,
     confirm_password_reset,
-    register_company,
     request_password_reset,
     review_company,
     refund_deposit,
     update_policy_report_status,
     upload_verification_document,
 )
-from auth import router as auth_router
+from auth import LoginRequest, login as auth_login, register_company_user, router as auth_router
 from company_portal import (
     VerificationApplicationUpdate,
     company_requests,
@@ -55,7 +51,6 @@ from database import (
 from models import (
     ChatMessage,
     Company,
-    CompanyLoginSession,
     CompanyPasswordResetToken,
     CompanyProject,
     CompanyQuote,
@@ -87,6 +82,7 @@ from quote_requests import (
     router as quote_requests_router,
 )
 from companies import router as companies_router
+from security import create_access_token
 
 
 class MarketplaceTests(unittest.TestCase):
@@ -176,41 +172,76 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(company, (1, "Existing Solar", None))
         legacy_engine.dispose()
 
-    def register(self, email="solar@example.com", projects_count=3):
-        return register_company(
+    def register_company_account(self, registration):
+        """Register a company the way the app does (company user + JWT)."""
+        response = register_company_user(registration, self.session)
+        return {
+            "id": response.user.company_id,
+            "name": registration.name,
+            "verification_status": self.session.get(Company, response.user.company_id).verification_status,
+            "access_token": response.access_token,
+        }
+
+    def register(self, email="solar@example.com", projects_count=3, phone="07700000000"):
+        return self.register_company_account(
             CompanyRegistration(
                 name="Test Solar",
                 founded_year=2015,
-                phone="07700000000",
+                phone=phone,
                 email=email,
                 password="a-long-test-password",
                 address="Baghdad",
                 business_license_number="LIC-12345",
                 tax_registration_number="TAX-12345",
                 projects_count=projects_count,
-            ),
-            self.session,
+            )
         )
+
+    def admin_user(self):
+        """A signed-in administrator (the shared admin token no longer exists)."""
+        admin = self.session.exec(select(User).where(User.email == "admin-test@example.com")).first()
+        if admin is None:
+            admin = User(
+                email="admin-test@example.com",
+                hashed_password="not-used",
+                full_name="Test Admin",
+                role="admin",
+                is_active=True,
+                is_verified=True,
+            )
+            self.session.add(admin)
+            self.session.commit()
+            self.session.refresh(admin)
+        return admin
+
+    def admin_bearer(self):
+        return create_access_token(self.admin_user())
+
+    def company_token(self, company_id):
+        """JWT of the company user linked to a company."""
+        user = self.session.exec(select(User).where(User.company_id == company_id)).one()
+        return create_access_token(user)
+
+    def login_company_user(self, email, password):
+        """Companies sign in through /api/auth/login like every other account."""
+        response = auth_login(LoginRequest(email=email, password=password), self.session)
+        return {"access_token": response.access_token}
 
     def approve(self, company_id):
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            review_company(
-                company_id,
-                CompanyVerificationReview(
-                    decision="verified",
-                    license_checked=True,
-                    tax_record_checked=True,
-                    projects_checked=True,
-                ),
-                "test-admin-token",
-                self.session,
-            )
+        review_company(
+            company_id,
+            CompanyVerificationReview(
+                decision="verified",
+                license_checked=True,
+                tax_record_checked=True,
+                projects_checked=True,
+            ),
+            self.session,
+            self.admin_user(),
+        )
 
     def company_auth(self, email="solar@example.com"):
-        login = login_company(
-            CompanyLogin(email=email, password="a-long-test-password"),
-            self.session,
-        )
+        login = self.login_company_user(email=email, password="a-long-test-password")
         return f"Bearer {login['access_token']}"
 
     def simple_quote(self, total_iqd=10_000_000):
@@ -247,13 +278,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_identity_verified_company_can_submit_quotes_but_pending_company_cannot(self):
         company = self.register()
         request = self.request_for(company["id"])
-        company_token = "tier-one-quote-test-token"
-        self.session.add(CompanyLoginSession(
-            company_id=company["id"],
-            token_hash=_token_hash(company_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        ))
-        self.session.commit()
+        company_token = self.company_token(company["id"])
         payload = QuoteCreate(
             total_iqd=10_000_000,
             panel_iqd=4_000_000,
@@ -287,16 +312,15 @@ class MarketplaceTests(unittest.TestCase):
             data_base64=base64.b64encode(b"%PDF-1.4 test").decode("ascii"),
         ))
         self.session.commit()
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            review_company(
-                company["id"],
-                CompanyVerificationReview(
-                    decision="identity_verified",
-                    identity_document_checked=True,
-                ),
-                "test-admin-token",
-                self.session,
-            )
+        review_company(
+            company["id"],
+            CompanyVerificationReview(
+                decision="identity_verified",
+                identity_document_checked=True,
+            ),
+            self.session,
+            self.admin_user(),
+        )
 
         submitted = submit_company_quote(
             request["group_id"],
@@ -679,26 +703,24 @@ class MarketplaceTests(unittest.TestCase):
                 )
                 # After the deposit, the company may contact the customer.
                 self.assertEqual(company_paid_request["customer_phone"], "07722223333")
-                with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-                    revenue_rows = admin_revenue("test-admin-token", self.session, None)
-                    paid_revenue = next(row for row in revenue_rows if row["request_id"] == persisted_request.id)
-                    self.assertEqual(paid_revenue["payment_status"], "simulated")
-                    self.assertEqual(paid_revenue["commission_status"], "simulated")
-                    self.assertEqual(paid_revenue["deposit_iqd"], 600_000)
-                    refund_result = refund_deposit(
-                        paid_revenue["assignment_id"],
-                        "test-admin-token",
-                        self.session,
-                        None,
+                revenue_rows = admin_revenue(self.session, self.admin_user())
+                paid_revenue = next(row for row in revenue_rows if row["request_id"] == persisted_request.id)
+                self.assertEqual(paid_revenue["payment_status"], "simulated")
+                self.assertEqual(paid_revenue["commission_status"], "simulated")
+                self.assertEqual(paid_revenue["deposit_iqd"], 600_000)
+                refund_result = refund_deposit(
+                    paid_revenue["assignment_id"],
+                    self.session,
+                    self.admin_user(),
+                )
+                self.assertEqual(refund_result["payment_status"], "refunded")
+                self.assertEqual(refund_result["commission_status"], "reversed")
+                stored_payment = self.session.exec(
+                    select(DepositPayment).where(
+                        DepositPayment.assignment_id == paid_revenue["assignment_id"]
                     )
-                    self.assertEqual(refund_result["payment_status"], "refunded")
-                    self.assertEqual(refund_result["commission_status"], "reversed")
-                    stored_payment = self.session.exec(
-                        select(DepositPayment).where(
-                            DepositPayment.assignment_id == paid_revenue["assignment_id"]
-                        )
-                    ).one()
-                    self.assertEqual(stored_payment.project_status, "cancelled")
+                ).one()
+                self.assertEqual(stored_payment.project_status, "cancelled")
                 verification_id = accepted.json()["companies"][0]["green_verification_id"]
                 self.assertTrue(verification_id)
                 company_verification = self.session.get(CompanyVerification, company_id)
@@ -782,13 +804,12 @@ class MarketplaceTests(unittest.TestCase):
                 self.assertEqual(company.verification_status, "pending")
 
     def test_company_can_register_before_submitting_verification_details(self):
-        result = register_company(
+        result = self.register_company_account(
             CompanyRegistration(
                 name="Incomplete Solar",
                 email="incomplete@example.com",
                 password="a-long-test-password",
             ),
-            self.session,
         )
         company = self.session.get(Company, result["id"])
         self.assertEqual(company.verification_status, "pending")
@@ -829,13 +850,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_admin_can_review_uploaded_verification_document_without_changing_company_records(self):
         company_result = self.register()
         company = self.session.get(Company, company_result["id"])
-        company_token = "test-company-document-token"
-        self.session.add(CompanyLoginSession(
-            company_id=company.id,
-            token_hash=_token_hash(company_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        ))
-        self.session.commit()
+        company_token = self.company_token(company.id)
         document_data = b"%PDF-1.4\nminimal test document"
         upload = VerificationDocumentUpload(
             document_type="license",
@@ -1043,13 +1058,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_request_chat_delivers_messages_masks_contact_and_logs_admin_report(self):
         company = self.register()
         request = self.request_for(company["id"])
-        company_token = "legacy-company-chat-session-token"
-        self.session.add(CompanyLoginSession(
-            company_id=company["id"],
-            token_hash=_token_hash(company_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        ))
-        self.session.commit()
+        company_token = self.company_token(company["id"])
 
         normal = create_chat_message(
             request["group_id"],
@@ -1096,13 +1105,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_chat_http_flow_exposes_blocked_attempt_in_admin_reports(self):
         company = self.register()
         request = self.request_for(company["id"])
-        company_token = "legacy-company-http-chat-session-token"
-        self.session.add(CompanyLoginSession(
-            company_id=company["id"],
-            token_hash=_token_hash(company_token),
-            expires_at=datetime.now(timezone.utc) + timedelta(hours=1),
-        ))
-        self.session.commit()
+        company_token = self.company_token(company["id"])
 
         app = FastAPI()
         app.include_router(quote_requests_router)
@@ -1116,24 +1119,23 @@ class MarketplaceTests(unittest.TestCase):
             f"/api/quote-requests/{request['group_id']}/companies/"
             f"{company['id']}/messages"
         )
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            with TestClient(app) as client:
-                delivered = client.post(
-                    f"{path}?access_token={request['access_token']}",
-                    json={"content": "Your request is received; we will prepare a quote."},
-                )
-                company_history = client.get(
-                    path,
-                    headers={"Authorization": f"Bearer {company_token}"},
-                )
-                blocked = client.post(
-                    f"{path}?access_token={request['access_token']}",
-                    json={"content": "My WhatsApp is 078-123-45678"},
-                )
-                admin_reports = client.get(
-                    "/api/companies/admin/reports",
-                    headers={"X-Admin-Token": "test-admin-token"},
-                )
+        with TestClient(app) as client:
+            delivered = client.post(
+                f"{path}?access_token={request['access_token']}",
+                json={"content": "Your request is received; we will prepare a quote."},
+            )
+            company_history = client.get(
+                path,
+                headers={"Authorization": f"Bearer {company_token}"},
+            )
+            blocked = client.post(
+                f"{path}?access_token={request['access_token']}",
+                json={"content": "My WhatsApp is 078-123-45678"},
+            )
+            admin_reports = client.get(
+                "/api/companies/admin/reports",
+                headers={"Authorization": f"Bearer {self.admin_bearer()}"},
+            )
 
         self.assertEqual(delivered.status_code, 201)
         self.assertEqual(company_history.status_code, 200)
@@ -1176,12 +1178,11 @@ class MarketplaceTests(unittest.TestCase):
             yield self.session
 
         app.dependency_overrides[get_session] = override_session
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            with TestClient(app) as client:
-                self.assertEqual(client.get("/api/companies/admin/revenue").status_code, 401)
-                headers = {"X-Admin-Token": "test-admin-token"}
-                revenue = client.get("/api/companies/admin/revenue", headers=headers)
-                reports = client.get("/api/companies/admin/reports", headers=headers)
+        with TestClient(app) as client:
+            self.assertEqual(client.get("/api/companies/admin/revenue").status_code, 401)
+            headers = {"Authorization": f"Bearer {self.admin_bearer()}"}
+            revenue = client.get("/api/companies/admin/revenue", headers=headers)
+            reports = client.get("/api/companies/admin/reports", headers=headers)
         self.assertEqual(revenue.status_code, 200)
         self.assertEqual(revenue.json(), [])
         self.assertEqual(reports.status_code, 200)
@@ -1221,7 +1222,7 @@ class MarketplaceTests(unittest.TestCase):
         self.assertEqual(public_projects[0]["location"], "Baghdad · Mansour")
 
     def test_public_company_directory_includes_phone_only_after_verification(self):
-        pending_company = self.register()
+        pending_company = self.register(phone="07700000009")
         verified_company = self.register(email="verified@example.com")
         self.approve(verified_company["id"])
 
@@ -1234,39 +1235,37 @@ class MarketplaceTests(unittest.TestCase):
 
     def test_company_cannot_be_verified_without_all_checks_and_three_projects(self):
         company = self.register(projects_count=2)
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            with self.assertRaises(HTTPException) as error:
-                review_company(
-                    company["id"],
-                    CompanyVerificationReview(
-                        decision="verified",
-                        license_checked=True,
-                        tax_record_checked=True,
-                        projects_checked=True,
-                    ),
-                    "test-admin-token",
-                    self.session,
-                )
+        with self.assertRaises(HTTPException) as error:
+            review_company(
+                company["id"],
+                CompanyVerificationReview(
+                    decision="verified",
+                    license_checked=True,
+                    tax_record_checked=True,
+                    projects_checked=True,
+                ),
+                self.session,
+                self.admin_user(),
+            )
         self.assertEqual(error.exception.status_code, 422)
 
     def test_admin_must_check_each_evidence_category(self):
         company = self.register()
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            queue = list_pending_companies("test-admin-token", self.session)
-            self.assertEqual(queue[0]["business_license_number"], "LIC-12345")
-            self.assertEqual(queue[0]["tax_registration_number"], "TAX-12345")
-            with self.assertRaises(HTTPException) as error:
-                review_company(
-                    company["id"],
-                    CompanyVerificationReview(
-                        decision="verified",
-                        license_checked=True,
-                        tax_record_checked=True,
-                        projects_checked=False,
-                    ),
-                    "test-admin-token",
-                    self.session,
-                )
+        queue = list_pending_companies(self.session, self.admin_user())
+        self.assertEqual(queue[0]["business_license_number"], "LIC-12345")
+        self.assertEqual(queue[0]["tax_registration_number"], "TAX-12345")
+        with self.assertRaises(HTTPException) as error:
+            review_company(
+                company["id"],
+                CompanyVerificationReview(
+                    decision="verified",
+                    license_checked=True,
+                    tax_record_checked=True,
+                    projects_checked=False,
+                ),
+                self.session,
+                self.admin_user(),
+            )
         self.assertEqual(error.exception.status_code, 422)
 
     def test_legacy_verified_company_retains_status_without_evidence(self):
@@ -1296,10 +1295,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_company_can_resubmit_verification_evidence(self):
         company = self.register()
         self.approve(company["id"])
-        login = login_company(
-            CompanyLogin(email="solar@example.com", password="a-long-test-password"),
-            self.session,
-        )
+        login = self.login_company_user(email="solar@example.com", password="a-long-test-password")
         result = update_verification_application(
             VerificationApplicationUpdate(
                 business_license_number="LIC-NEW",
@@ -1324,7 +1320,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_company_login_can_read_inbox_and_submit_real_quote(self):
         company = self.register()
         self.approve(company["id"])
-        login = login_company(CompanyLogin(email="solar@example.com", password="a-long-test-password"), self.session)
+        login = self.login_company_user(email="solar@example.com", password="a-long-test-password")
         request = self.request_for(company["id"])
         authorization = f"Bearer {login['access_token']}"
         inbox = company_requests(authorization, self.session)
@@ -1363,13 +1359,13 @@ class MarketplaceTests(unittest.TestCase):
     def test_company_login_normalizes_email_case_and_surrounding_whitespace(self):
         registered = self.register()
 
-        login = login_company(
-            CompanyLogin(email="  SOLAR@EXAMPLE.COM  ", password="a-long-test-password"),
+        response = auth_login(
+            LoginRequest(email="  SOLAR@EXAMPLE.COM  ", password="a-long-test-password"),
             self.session,
         )
 
-        self.assertEqual(login["company"].id, registered["id"])
-        self.assertTrue(login["access_token"])
+        self.assertEqual(response.user.company_id, registered["id"])
+        self.assertTrue(response.access_token)
 
     def test_pending_company_is_public_and_can_receive_requests(self):
         company = self.register()
@@ -1430,10 +1426,7 @@ class MarketplaceTests(unittest.TestCase):
         visible_companies = {item.id: item for item in get_companies(self.session)}
         self.assertIn(company["id"], visible_companies)
         self.assertEqual(visible_companies[company["id"]].verification_status, "pending")
-        login = login_company(
-            CompanyLogin(email="solar@example.com", password="a-long-test-password"),
-            self.session,
-        )
+        login = self.login_company_user(email="solar@example.com", password="a-long-test-password")
         request = self.request_for(company["id"])
         authorization = f"Bearer {login['access_token']}"
         # Unverified companies cannot read customer requests at all.
@@ -1464,10 +1457,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_customer_can_select_only_a_submitted_quote(self):
         company = self.register()
         self.approve(company["id"])
-        login = login_company(
-            CompanyLogin(email="solar@example.com", password="a-long-test-password"),
-            self.session,
-        )
+        login = self.login_company_user(email="solar@example.com", password="a-long-test-password")
         request = self.request_for(company["id"])
         submit_company_quote(
             request["group_id"],
@@ -1498,10 +1488,7 @@ class MarketplaceTests(unittest.TestCase):
     def test_company_can_mark_a_quoted_request_completed_and_link_customer_project(self):
         company_result = self.register()
         self.approve(company_result["id"])
-        login = login_company(
-            CompanyLogin(email="solar@example.com", password="a-long-test-password"),
-            self.session,
-        )
+        login = self.login_company_user(email="solar@example.com", password="a-long-test-password")
         request = self.request_for(company_result["id"])
         authorization = f"Bearer {login['access_token']}"
         submit_company_quote(
@@ -1552,50 +1539,67 @@ class MarketplaceTests(unittest.TestCase):
 
     def test_rejected_company_is_hidden_and_cannot_receive_requests(self):
         company = self.register()
-        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "test-admin-token"}):
-            review_company(
-                company["id"],
-                CompanyVerificationReview(decision="rejected"),
-                "test-admin-token",
-                self.session,
-            )
+        review_company(
+            company["id"],
+            CompanyVerificationReview(decision="rejected"),
+            self.session,
+            self.admin_user(),
+        )
         listings = get_companies(self.session)
         self.assertNotIn(company["id"], {item.id for item in listings})
         with self.assertRaises(HTTPException) as error:
             self.request_for(company["id"])
         self.assertEqual(error.exception.status_code, 422)
 
-    def test_company_logout_revokes_the_session(self):
+    def test_old_company_login_and_admin_token_are_gone(self):
         self.register()
-        login = login_company(
-            CompanyLogin(email="solar@example.com", password="a-long-test-password"),
-            self.session,
-        )
-        authorization = f"Bearer {login['access_token']}"
-        logout_company(authorization, self.session)
-        with self.assertRaises(HTTPException) as error:
-            company_requests(authorization, self.session)
-        self.assertEqual(error.exception.status_code, 401)
+        app = FastAPI()
+        app.include_router(companies_router)
+        app.include_router(company_portal_router)
 
-    def test_company_session_expiry_handles_sqlite_naive_datetime(self):
+        def override_session():
+            yield self.session
+
+        app.dependency_overrides[get_session] = override_session
+        with patch.dict(os.environ, {"UTU_ADMIN_TOKEN": "old-shared-admin-token"}):
+            with TestClient(app) as client:
+                old_login = client.post(
+                    "/api/companies/login",
+                    json={"email": "solar@example.com", "password": "a-long-test-password"},
+                )
+                old_register = client.post(
+                    "/api/companies/register",
+                    json={"name": "Legacy Solar", "email": "legacy@example.com", "password": "a-long-test-password"},
+                )
+                old_logout = client.post("/api/companies/logout")
+                shared_token = client.get(
+                    "/api/companies/admin/pending",
+                    headers={"X-Admin-Token": "old-shared-admin-token"},
+                )
+                random_session = client.get(
+                    "/api/company/requests",
+                    headers={"Authorization": "Bearer an-old-opaque-company-session-token"},
+                )
+                admin_jwt = client.get(
+                    "/api/companies/admin/pending",
+                    headers={"Authorization": f"Bearer {self.admin_bearer()}"},
+                )
+        self.assertIn(old_login.status_code, {404, 405})
+        self.assertIn(old_register.status_code, {404, 405})
+        self.assertIn(old_logout.status_code, {404, 405})
+        self.assertEqual(shared_token.status_code, 401)
+        self.assertEqual(random_session.status_code, 401)
+        self.assertEqual(admin_jwt.status_code, 200)
+
+    def test_non_admin_accounts_cannot_use_admin_endpoints(self):
         company = self.register()
-        token = "a-valid-company-session-token"
-        self.session.add(CompanyLoginSession(
-            company_id=company["id"],
-            token_hash=_token_hash(token),
-            expires_at=datetime.now(timezone.utc) + timedelta(minutes=5),
-        ))
-        self.session.commit()
-
-        self.assertEqual(_authenticated_company_id(f"Bearer {token}", self.session), company["id"])
-
-        login_session = self.session.exec(select(CompanyLoginSession)).one()
-        login_session.expires_at = datetime.now(timezone.utc) - timedelta(seconds=1)
-        self.session.add(login_session)
-        self.session.commit()
-        with self.assertRaises(HTTPException) as error:
-            _authenticated_company_id(f"Bearer {token}", self.session)
-        self.assertEqual(error.exception.status_code, 401)
+        company_user = self.session.exec(select(User).where(User.company_id == company["id"])).one()
+        with self.assertRaises(HTTPException) as as_company:
+            list_pending_companies(self.session, company_user)
+        self.assertEqual(as_company.exception.status_code, 403)
+        with self.assertRaises(HTTPException) as anonymous:
+            list_pending_companies(self.session, None)
+        self.assertEqual(anonymous.exception.status_code, 401)
 
     def test_password_reset_requires_email_configuration(self):
         self.register()
@@ -1625,10 +1629,7 @@ class MarketplaceTests(unittest.TestCase):
 
     def test_password_reset_is_generic_one_time_and_revokes_sessions(self):
         self.register()
-        original_login = login_company(
-            CompanyLogin(email="solar@example.com", password="a-long-test-password"),
-            self.session,
-        )
+        original_login = self.login_company_user(email="solar@example.com", password="a-long-test-password")
         with patch("companies.smtp_is_configured", return_value=True), patch(
             "companies.send_password_reset_email"
         ) as send_email:
@@ -1655,15 +1656,12 @@ class MarketplaceTests(unittest.TestCase):
         with self.assertRaises(HTTPException) as old_session:
             company_requests(f"Bearer {original_login['access_token']}", self.session)
         self.assertEqual(old_session.exception.status_code, 401)
-        login_company(
-            CompanyLogin(email="solar@example.com", password="another-long-password"),
-            self.session,
-        )
+        self.login_company_user(email="solar@example.com", password="another-long-password")
 
 
     def test_quote_is_locked_once_the_customer_accepts(self):
-        first = self.register(email="first@example.com")
-        second = self.register(email="second@example.com")
+        first = self.register(email="first@example.com", phone="07700000001")
+        second = self.register(email="second@example.com", phone="07700000002")
         self.approve(first["id"])
         self.approve(second["id"])
         request = create_quote_request(

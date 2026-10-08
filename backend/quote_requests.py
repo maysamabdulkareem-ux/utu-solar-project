@@ -15,7 +15,6 @@ from projects import ProjectRead, _project_payload
 from models import (
     ChatMessage,
     Company,
-    CompanyLoginSession,
     CompanyQuote,
     CompanyVerification,
     DepositPayment,
@@ -26,7 +25,7 @@ from models import (
     Review,
     User,
 )
-from security import get_optional_current_user, require_role, user_from_token
+from security import company_id_from_authorization, get_optional_current_user, require_role
 from verification import can_submit_quotes
 
 router = APIRouter(prefix="/api/quote-requests", tags=["Quote requests"])
@@ -997,25 +996,7 @@ def complete_company_installation(
 
 
 def _authenticated_company_id(authorization: Optional[str], session: Session) -> int:
-    if not authorization or not authorization.lower().startswith("bearer "):
-        raise HTTPException(status_code=401, detail="Company login is required")
-    token = authorization[7:].strip()
-    login_session = session.exec(
-        select(CompanyLoginSession).where(CompanyLoginSession.token_hash == _token_hash(token))
-    ).first()
-    if login_session is not None:
-        if _as_utc(login_session.expires_at) <= datetime.now(timezone.utc):
-            raise HTTPException(status_code=401, detail="Company session expired")
-        return login_session.company_id
-
-    user = user_from_token(token, session)
-    if user.role != "company" or user.company_id is None:
-        raise HTTPException(status_code=403, detail="A company account is required")
-    return user.company_id
-
-
-def _as_utc(value: datetime) -> datetime:
-    return value.replace(tzinfo=timezone.utc) if value.tzinfo is None else value.astimezone(timezone.utc)
+    return company_id_from_authorization(authorization, session)
 
 
 def _mask_client_name(name: str) -> str:
