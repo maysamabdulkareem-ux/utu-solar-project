@@ -95,7 +95,7 @@ describe('Header account navigation', () => {
     };
     renderHeader();
 
-    expect(screen.getByRole('button', { name: 'Post Project' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Request a Quote' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Get Started' })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Account: Solar Client' }));
     const accountMenu = within(screen.getByRole('region', { name: 'Account menu' }));

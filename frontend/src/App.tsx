@@ -36,11 +36,9 @@ export default function App() {
 
       {route === 'request' && <RequestQuotePage />}
       {route === 'requests' && <MyRequestsPage />}
-      {route === 'company' && (
-        <ProtectedRoute allowedRoles={['company']}>
-          <CompanyPortalPage />
-        </ProtectedRoute>
-      )}
+      {/* The company portal is its own door: it shows the company sign-in and
+          registration screen itself, and turns client accounts away. */}
+      {route === 'company' && <CompanyPortalPage />}
       {route === 'admin' && (
         <ProtectedRoute allowedRoles={['admin']}>
           <CompanyPortalPage />

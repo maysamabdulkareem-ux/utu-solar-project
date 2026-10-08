@@ -14,6 +14,25 @@ export const AUTH_TOKEN_KEY = 'utu-auth-token';
 
 type ClientRegistration = { email: string; phone?: string; password: string; full_name: string };
 
+export type AccountRole = AuthUser['role'];
+
+/**
+ * Thrown by `login` when the account exists but belongs to a different
+ * sign-in screen (for example a client account used on the company portal).
+ * No session is stored in that case.
+ */
+export class WrongAccountTypeError extends Error {
+  constructor(readonly role: AccountRole) {
+    super(`This is a ${role} account`);
+    this.name = 'WrongAccountTypeError';
+  }
+}
+
+type LoginOptions = {
+  /** Only these account types may sign in from the calling screen. */
+  allowedRoles?: readonly AccountRole[];
+};
+
 type AuthValue = {
   user: AuthUser | null;
   token: string;
@@ -21,11 +40,10 @@ type AuthValue = {
   isLoading: boolean;
   authModalOpen: boolean;
   authModalMode: 'login' | 'register';
-  authModalRole: 'client' | 'company';
   openAuthModal: () => void;
-  openCompanyRegistrationModal: () => void;
+  openClientRegistration: () => void;
   closeAuthModal: () => void;
-  login: (email: string, password: string) => Promise<AuthUser>;
+  login: (email: string, password: string, options?: LoginOptions) => Promise<AuthUser>;
   register: (kind: 'client' | 'company', body: ClientRegistration | CompanyRegistrationBody) => Promise<AuthUser>;
   registerClient: (body: ClientRegistration) => Promise<AuthUser>;
   registerCompany: (body: CompanyRegistrationBody) => Promise<AuthUser>;
@@ -58,15 +76,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setLoading] = useState(Boolean(readToken()));
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
-  const [authModalRole, setAuthModalRole] = useState<'client' | 'company'>('client');
+  // The pop-up is the client sign-in screen; companies use the portal page.
   const openAuthModal = useCallback(() => {
     setAuthModalMode('login');
-    setAuthModalRole('client');
     setAuthModalOpen(true);
   }, []);
-  const openCompanyRegistrationModal = useCallback(() => {
+  const openClientRegistration = useCallback(() => {
     setAuthModalMode('register');
-    setAuthModalRole('company');
     setAuthModalOpen(true);
   }, []);
   const closeAuthModal = useCallback(() => setAuthModalOpen(false), []);
@@ -105,8 +121,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void refreshProfile();
   }, [refreshProfile]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    return acceptSession(await api.authLogin(email, password));
+  const login = useCallback(async (email: string, password: string, options?: LoginOptions) => {
+    const response = await api.authLogin(email, password);
+    // Check the account type before keeping the session, so a wrong-door
+    // sign-in leaves nothing behind (and does not clear the device's data).
+    if (options?.allowedRoles && !options.allowedRoles.includes(response.user.role)) {
+      throw new WrongAccountTypeError(response.user.role);
+    }
+    return acceptSession(response);
   }, [acceptSession]);
 
   const registerClient = useCallback(async (body: ClientRegistration) => {
@@ -141,9 +163,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading,
     authModalOpen,
     authModalMode,
-    authModalRole,
     openAuthModal,
-    openCompanyRegistrationModal,
+    openClientRegistration,
     closeAuthModal,
     login,
     register,
@@ -151,7 +172,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     registerCompany,
     logout,
     refreshProfile,
-  }), [user, token, isLoading, authModalOpen, authModalMode, authModalRole, openAuthModal, openCompanyRegistrationModal, closeAuthModal, login, register, registerClient, registerCompany, logout, refreshProfile]);
+  }), [user, token, isLoading, authModalOpen, authModalMode, openAuthModal, openClientRegistration, closeAuthModal, login, register, registerClient, registerCompany, logout, refreshProfile]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

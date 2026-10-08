@@ -16,6 +16,7 @@ import {
 import { Button } from '../components/ui/Button';
 import { Icon } from '../components/icons/Icon';
 import { Input } from '../components/ui/Input';
+import { CompanyAuthForm } from '../components/auth/CompanyAuthForm';
 import { RequestChat } from '../components/rfq/RequestChat';
 import { MarkViewedOnScreen } from '../components/rfq/MarkViewedOnScreen';
 import { SUPPORT_PHONE_PATTERN } from '../lib/supportPhone';
@@ -128,7 +129,7 @@ function CompanyPasswordInput({
 
 export function CompanyPortalPage() {
   const { lang } = useLanguage();
-  const { user, token: authToken, logout: logoutAuth, openAuthModal } = useAuth();
+  const { user, token: authToken, isLoading: authLoading, logout: logoutAuth } = useAuth();
   const ar = lang === 'ar';
   const [resetToken, setResetToken] = useState(readPasswordResetToken);
   const [mode, setMode] = useState<PortalMode>(() => (
@@ -181,7 +182,6 @@ export function CompanyPortalPage() {
     subtitle: user?.role === 'admin'
       ? (ar ? 'راجع طلبات توثيق الشركات وأدر المشاريع باستخدام صلاحية حساب المسؤول.' : 'Review company verification applications and manage projects using your administrator account.')
       : (ar ? 'سجّل شركتك وتابع طلبات عروض الأسعار المرسلة إليك.' : 'Register your company and respond to quote requests sent to you.'),
-    login: ar ? 'تسجيل الدخول' : 'Sign in',
     name: ar ? 'اسم الشركة' : 'Company name',
     phone: ar ? 'رقم الموبايل الرئيسي' : 'Primary Mobile',
     supportPhone: ar ? 'رقم الدعم السريع للشركة' : 'Company Support Hotline',
@@ -195,7 +195,11 @@ export function CompanyPortalPage() {
     address: ar ? 'المحافظة والعنوان' : 'Governorate and address',
     license: ar ? 'رقم رخصة النشاط' : 'Business license number',
     tax: ar ? 'رقم التسجيل الضريبي' : 'Tax registration number',
-    signInWithAccount: ar ? 'سجّل الدخول بحساب شركتك من زر تسجيل الدخول في أعلى الصفحة.' : 'Sign in with your company account using the Sign in button at the top of the page.',
+    signedInAsClient: ar
+      ? 'أنت داخل بحساب زبون. بوابة الشركات مخصصة لحسابات الشركات فقط.'
+      : 'You are signed in with a client account. The company portal is for company accounts only.',
+    goToMyRequests: ar ? 'الذهاب إلى طلباتي' : 'Go to my requests',
+    switchAccount: ar ? 'تسجيل الخروج والدخول بحساب شركة' : 'Sign out and use a company account',
     inbox: ar ? 'طلبات عروض الأسعار' : 'Quote requests',
     empty: ar ? 'ماكو طلبات مرسلة لشركتك حالياً.' : 'There are no requests for your company yet.',
     logout: ar ? 'تسجيل الخروج' : 'Sign out',
@@ -480,8 +484,8 @@ export function CompanyPortalPage() {
         setResetToken('');
         window.location.hash = '#/company';
         setNotice(text.resetComplete);
+        setMode('portal');
         logoutAuth();
-        openAuthModal();
       }
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : 'Request failed';
@@ -1133,10 +1137,15 @@ export function CompanyPortalPage() {
                     </button>
                   </div>
                 </form>
-              </> : <>
-                <p role="status" className="rounded-lg border border-line-subtle bg-bg-subtle px-4 py-3 text-body-sm text-content-secondary">{text.signInWithAccount}</p>
-                <Button className="mt-4" onClick={openAuthModal}>{text.login}</Button>
-              </>}
+              </> : user?.role === 'client' ? <>
+                <p role="status" className="rounded-lg border border-line-subtle bg-bg-subtle px-4 py-3 text-body-sm text-content-secondary">{text.signedInAsClient}</p>
+                <div className="mt-4 flex flex-wrap gap-3">
+                  <Button onClick={() => { window.location.hash = '#/requests'; }}>{text.goToMyRequests}</Button>
+                  <Button variant="secondary" onClick={() => logoutAuth()}>{text.switchAccount}</Button>
+                </div>
+              </> : user?.role === 'company' || authLoading ? null : (
+                <CompanyAuthForm onForgotPassword={() => { setMode('forgot'); setError(''); setNotice(''); }} />
+              )}
             </section>
           ) : (
             <section className="mt-8">

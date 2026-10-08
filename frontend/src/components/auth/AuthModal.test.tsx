@@ -27,12 +27,11 @@ afterEach(() => {
 beforeEach(() => localStorage.clear());
 
 function ModalHarness() {
-  const { openAuthModal, openCompanyRegistrationModal } = useAuth();
+  const { openAuthModal } = useAuth();
   const { setLang } = useLanguage();
   return (
     <>
       <button onClick={openAuthModal}>Open authentication</button>
-      <button onClick={openCompanyRegistrationModal}>Register company from footer</button>
       <button onClick={() => setLang('ar')}>العربية</button>
       <AuthModal />
     </>
@@ -48,15 +47,15 @@ function renderModal() {
 }
 
 describe('AuthModal', () => {
-  it('opens directly on company registration when requested from company onboarding links', () => {
+  it('registers clients only and points companies to the company portal', () => {
     renderModal();
-    fireEvent.click(screen.getByRole('button', { name: 'Register company from footer' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open authentication' }));
+    fireEvent.click(screen.getAllByRole('button', { name: 'Create account' })[0]);
 
-    expect(screen.getByRole('heading', { name: 'Create account' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Company' })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByLabelText('Company name')).toBeInTheDocument();
-    expect(screen.getByLabelText('Iraqi Mobile Phone')).toBeRequired();
-    expect(screen.getByLabelText('Company Support Hotline')).toBeRequired();
+    expect(screen.getByLabelText('Full name')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Company' })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Company name')).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Register or sign in on the company portal' })).toHaveAttribute('href', '#/company');
   });
 
   it('starts with blank fields and keeps passwords hidden unless explicitly shown', () => {
@@ -96,7 +95,7 @@ describe('AuthModal', () => {
     expect(reopenedPassword.type).toBe('password');
   });
 
-  it('clears form values when changing between login and registration roles', () => {
+  it('clears form values when changing between login and registration', () => {
     renderModal();
     fireEvent.click(screen.getByRole('button', { name: 'Open authentication' }));
     expect(screen.getAllByRole('button', { name: 'Create account' })).toHaveLength(1);
@@ -106,14 +105,7 @@ describe('AuthModal', () => {
 
     expect((screen.getByLabelText('Email address') as HTMLInputElement).value).toBe('');
     expect((screen.getByLabelText('Password') as HTMLInputElement).value).toBe('');
-    fireEvent.click(screen.getByRole('button', { name: 'Company' }));
-    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Previously typed company' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Client' }));
-
     expect(screen.getByLabelText('Full name')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Company name')).not.toBeInTheDocument();
-    expect((screen.getByLabelText('Email address') as HTMLInputElement).value).toBe('');
-    expect((screen.getByLabelText('Password') as HTMLInputElement).value).toBe('');
   });
 
   it('explains when the active backend does not expose auth endpoints', async () => {
@@ -176,7 +168,7 @@ describe('AuthModal', () => {
     await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('أكمل جميع الحقول المطلوبة.'));
   });
 
-  it('switches to company registration and submits a company account', async () => {
+  it('takes a company that signs in from the client pop-up to its portal', async () => {
     const response = {
       access_token: 'company-jwt',
       token_type: 'bearer',
@@ -192,40 +184,18 @@ describe('AuthModal', () => {
         created_at: '2026-01-01T00:00:00Z',
       },
     } as const;
-    vi.mocked(api.authRegisterCompany).mockResolvedValue(response);
+    vi.mocked(api.authLogin).mockResolvedValue(response);
     vi.mocked(api.authMe).mockResolvedValue(response.user);
+    window.location.hash = '#/';
     renderModal();
 
     fireEvent.click(screen.getByRole('button', { name: 'Open authentication' }));
-    fireEvent.click(screen.getAllByRole('button', { name: 'Create account' })[0]);
-    fireEvent.click(screen.getByRole('button', { name: 'Company' }));
-    expect(screen.getByLabelText('Company name')).toBeInTheDocument();
-    expect(screen.queryByLabelText('Full name')).not.toBeInTheDocument();
-
-    fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Solar Company' } });
-    const primaryPhone = screen.getByLabelText('Iraqi Mobile Phone');
-    expect(primaryPhone).toHaveAttribute('placeholder', '077 / 078 / 075 XXXXXXXX');
-    expect(primaryPhone).toBeRequired();
-    const supportPhone = screen.getByLabelText('Company Support Hotline');
-    expect(supportPhone).toHaveAttribute('placeholder', '07XXXXXXXXX or 6060');
-    expect(supportPhone).toBeRequired();
-    fireEvent.change(primaryPhone, { target: { value: '07712345678' } });
-    fireEvent.change(supportPhone, { target: { value: '6060' } });
-    expect(supportPhone).toBeValid();
     fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'solar@example.com' } });
     fireEvent.change(screen.getByLabelText('Password'), { target: { value: 'a-long-company-password' } });
     fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
 
-    await waitFor(() => expect(api.authRegisterCompany).toHaveBeenCalledWith(expect.objectContaining({
-      name: 'Solar Company',
-      email: 'solar@example.com',
-      password: 'a-long-company-password',
-      phone: '07712345678',
-      support_phone: '6060',
-    })));
+    await waitFor(() => expect(window.location.hash).toBe('#/company'));
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('company-jwt');
-    fireEvent.click(screen.getByRole('button', { name: 'Open authentication' }));
-    await waitFor(() => expect(screen.getByRole('heading', { name: 'Signed in' })).toBeInTheDocument());
   });
 
   it('registers clients using the client endpoint and profile fields', async () => {

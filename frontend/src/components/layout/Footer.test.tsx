@@ -8,7 +8,6 @@ const { authState } = vi.hoisted(() => ({
   authState: {
     user: null as null | { role: 'company' | 'client' | 'admin' },
     isLoading: false,
-    openCompanyRegistrationModal: vi.fn(),
   },
 }));
 
@@ -25,7 +24,6 @@ afterEach(() => {
 function renderFooter(user: typeof authState.user = null) {
   authState.user = user;
   authState.isLoading = false;
-  authState.openCompanyRegistrationModal.mockReset();
   const scrollIntoView = vi.fn();
   vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
   Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', {
@@ -129,14 +127,13 @@ describe('Footer quick links', () => {
   });
 
   it.each(['Join Marketplace', 'Add Your Company', 'Manage Projects'])(
-    'opens company registration over the current page for logged-out visitors via %s',
+    'takes logged-out visitors to company registration on the portal via %s',
     (label) => {
       renderFooter();
       window.location.hash = '#top';
       fireEvent.click(screen.getByRole('link', { name: label }));
 
-      expect(authState.openCompanyRegistrationModal).toHaveBeenCalledOnce();
-      expect(window.location.hash).toBe('#top');
+      expect(window.location.hash).toBe('#/company?register');
     },
   );
 
@@ -146,7 +143,6 @@ describe('Footer quick links', () => {
       renderFooter({ role: 'company' });
       fireEvent.click(screen.getByRole('link', { name: label }));
 
-      expect(authState.openCompanyRegistrationModal).not.toHaveBeenCalled();
       expect(window.location.hash).toBe('#/company');
       expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: 'smooth' });
     },

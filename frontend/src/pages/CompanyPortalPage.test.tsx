@@ -15,6 +15,8 @@ import { AUTH_TOKEN_KEY, AuthProvider } from '../state/AuthContext';
 vi.mock('../api/client', () => ({
   api: {
     authMe: vi.fn(),
+    authLogin: vi.fn(),
+    authRegisterCompany: vi.fn(),
     adminPendingCompanies: vi.fn(),
     adminRevenue: vi.fn(),
     refundDepositPayment: vi.fn(),
@@ -585,11 +587,102 @@ describe('CompanyPortalPage quote marketplace', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Sign out' }));
 
-    // Signing in again happens through the main account login.
-    expect(await screen.findByRole('button', { name: 'Sign in' })).toBeInTheDocument();
+    // The portal shows its own company sign-in screen again.
+    expect(await screen.findByRole('tab', { name: 'Sign in' })).toBeInTheDocument();
     expect(screen.queryByText('Verification details sent for admin review.')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Admin review' })).not.toBeInTheDocument();
     expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+  });
+
+  describe('company sign-in screen', () => {
+    const clientUser: AuthUser = {
+      ...companyUser,
+      id: 9,
+      email: 'client@example.com',
+      full_name: 'Test Client',
+      role: 'client',
+      company_id: null,
+    };
+
+    function renderSignedOutPortal(hash = '#/company') {
+      localStorage.clear();
+      window.location.hash = hash;
+      return render(
+        <LanguageProvider>
+          <AuthProvider>
+            <CompanyPortalPage />
+          </AuthProvider>
+        </LanguageProvider>,
+      );
+    }
+
+    it('shows its own company sign-in form to logged-out visitors', async () => {
+      renderSignedOutPortal();
+      expect(await screen.findByRole('tab', { name: 'Sign in' })).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByRole('button', { name: 'Forgot password?' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Register or sign in as a client' })).toBeInTheDocument();
+    });
+
+    it('opens on company registration from #/company?register and creates a company account', async () => {
+      vi.mocked(api.authRegisterCompany).mockResolvedValue({
+        access_token: 'new-company-jwt',
+        token_type: 'bearer',
+        user: { ...companyUser, is_verified: false },
+      });
+      vi.mocked(api.authMe).mockResolvedValue({ ...companyUser, is_verified: false });
+      vi.mocked(api.companyProfile).mockResolvedValue(pendingCompany);
+      renderSignedOutPortal('#/company?register');
+
+      expect(await screen.findByRole('tab', { name: 'Register your company' })).toHaveAttribute('aria-selected', 'true');
+      fireEvent.change(screen.getByLabelText('Company name'), { target: { value: 'Sun Company' } });
+      fireEvent.change(screen.getByLabelText('Iraqi Mobile Phone'), { target: { value: '07712345678' } });
+      fireEvent.change(screen.getByLabelText('Company Support Hotline'), { target: { value: '6060' } });
+      fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'sun@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password (at least 10 characters)'), { target: { value: 'a-long-company-password' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+      await waitFor(() => expect(api.authRegisterCompany).toHaveBeenCalledWith(expect.objectContaining({
+        name: 'Sun Company',
+        email: 'sun@example.com',
+        phone: '07712345678',
+        support_phone: '6060',
+      })));
+      expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBe('new-company-jwt');
+    });
+
+    it('turns a client account away without signing it in', async () => {
+      vi.mocked(api.authLogin).mockResolvedValue({
+        access_token: 'client-jwt',
+        token_type: 'bearer',
+        user: clientUser,
+      });
+      renderSignedOutPortal();
+
+      await screen.findByRole('tab', { name: 'Sign in' });
+      fireEvent.change(screen.getByLabelText('Email address'), { target: { value: 'client@example.com' } });
+      fireEvent.change(screen.getByLabelText('Password (at least 10 characters)'), { target: { value: 'a-long-client-password' } });
+      fireEvent.click(screen.getByRole('button', { name: 'Continue' }));
+
+      expect(await screen.findByRole('alert')).toHaveTextContent('This is a client account.');
+      expect(localStorage.getItem(AUTH_TOKEN_KEY)).toBeNull();
+    });
+
+    it('tells a signed-in client that the portal is for companies', async () => {
+      localStorage.setItem(AUTH_TOKEN_KEY, 'client-jwt');
+      vi.mocked(api.authMe).mockResolvedValue(clientUser);
+      window.location.hash = '#/company';
+      render(
+        <LanguageProvider>
+          <AuthProvider>
+            <CompanyPortalPage />
+          </AuthProvider>
+        </LanguageProvider>,
+      );
+
+      expect(await screen.findByText('You are signed in with a client account. The company portal is for company accounts only.')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Sign in' })).not.toBeInTheDocument();
+      expect(api.companyProfile).not.toHaveBeenCalledWith('client-jwt');
+    });
   });
 
   it('uploads selected verification evidence with the company application', async () => {

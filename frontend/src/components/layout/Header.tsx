@@ -283,7 +283,7 @@ export function Header() {
           ) : (
             isLoading
               ? <span role="status" aria-label={t('auth.loadingAccount')} className="hidden h-10 w-28 animate-pulse rounded-lg bg-bg-panel-raised sm:block" />
-              : <Button variant="onDark" size="md" className="hidden sm:inline-flex" onClick={openAuthModal}>{t('cta.signin')}</Button>
+              : <Button variant="onDark" size="md" className="hidden sm:inline-flex" onClick={() => openAuthModal()}>{t('cta.signin')}</Button>
           )}
           {showRequestCta && (
             <Button

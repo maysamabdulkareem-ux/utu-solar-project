@@ -49,7 +49,7 @@ function isExternalHttpUrl(value?: string): value is string {
 
 export function Footer() {
   const { lang, t } = useLanguage();
-  const { user, isLoading, openCompanyRegistrationModal } = useAuth();
+  const { user, isLoading } = useAuth();
   const [dialog, setDialog] = useState<FooterDialog>(null);
   const [contactSuccess, setContactSuccess] = useState(false);
   const supportEmail = validSupportEmail(SUPPORT_EMAIL) ? SUPPORT_EMAIL : 'support@utu-solar.iq';
@@ -88,11 +88,8 @@ export function Footer() {
     }
 
     if (href.startsWith('#/')) {
-      if (href === paths.company && !user && !isLoading) {
-        openCompanyRegistrationModal();
-        return;
-      }
-      window.location.hash = href;
+      // Logged-out visitors land on the company portal's registration tab.
+      window.location.hash = href === paths.company && !user && !isLoading ? `${href}?register` : href;
       window.scrollTo({ top: 0, behavior: 'smooth' });
       return;
     }

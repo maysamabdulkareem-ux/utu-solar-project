@@ -1,11 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { ApiError } from '../../api/client';
-import {
-  IRAQI_MOBILE_PATTERN,
-  isValidIraqiMobile,
-  isValidSupportPhone,
-  SUPPORT_PHONE_PATTERN,
-} from '../../lib/supportPhone';
 import { useAuth } from '../../state/AuthContext';
 import { useLanguage } from '../../i18n/LanguageProvider';
 import type { TranslationKey } from '../../i18n/translations';
@@ -17,18 +11,15 @@ export function AuthModal() {
   const {
     authModalOpen,
     authModalMode,
-    authModalRole,
     closeAuthModal,
     login,
     registerClient,
-    registerCompany,
     logout,
     user,
   } = useAuth();
   const { lang, t } = useLanguage();
   const ar = lang === 'ar';
   const [mode, setMode] = useState<'login' | 'register'>(authModalMode);
-  const [registrationRole, setRegistrationRole] = useState<'client' | 'company'>(authModalRole);
   const [showPassword, setShowPassword] = useState(false);
   const [loginFieldsUnlocked, setLoginFieldsUnlocked] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -37,25 +28,23 @@ export function AuthModal() {
   const text = {
     login: t('auth.login'),
     register: t('auth.register'),
-    client: t('auth.client'),
-    company: t('auth.company'),
     email: t('auth.email'),
     password: t('auth.password'),
     name: t('auth.fullName'),
-    companyName: t('auth.companyName'),
     phone: t('auth.phone'),
-    founded: t('auth.founded'),
-    address: t('auth.address'),
-    license: t('auth.license'),
-    tax: t('auth.tax'),
-    projects: t('auth.projects'),
     submit: t('auth.submit'),
     close: t('auth.close'),
     show: t('auth.showPassword'),
     hide: t('auth.hidePassword'),
-    pending: t('auth.pendingCompany'),
     signedIn: t('auth.signedIn'),
     signOut: t('auth.signOut'),
+    companyDoor: ar ? 'عندك شركة طاقة شمسية؟' : 'Run a solar company?',
+    companyDoorLink: ar ? 'سجّل أو ادخل من بوابة الشركات' : 'Register or sign in on the company portal',
+  };
+  const roleLabel = {
+    client: t('auth.roleClient'),
+    company: t('auth.roleCompany'),
+    admin: t('auth.roleAdmin'),
   };
 
   const localizedError = (cause: unknown): TranslationKey => {
@@ -81,19 +70,17 @@ export function AuthModal() {
     setError('');
     if (!authModalOpen) {
       setMode('login');
-      setRegistrationRole('client');
       setLoginFieldsUnlocked(false);
       return;
     }
     setMode(authModalMode);
-    setRegistrationRole(authModalRole);
     setLoginFieldsUnlocked(false);
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') closeAuthModal();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [authModalOpen, authModalMode, authModalRole, closeAuthModal]);
+  }, [authModalOpen, authModalMode, closeAuthModal]);
 
   useEffect(() => {
     if (!authModalOpen) return;
@@ -113,15 +100,9 @@ export function AuthModal() {
     const email = String(fields.get(mode === 'login' ? 'login_identifier' : 'email') ?? '').trim();
     const password = String(fields.get(mode === 'login' ? 'login_secret' : 'password') ?? '');
     const fullName = String(fields.get('full_name') ?? '').trim();
-    const companyName = String(fields.get('company_name') ?? '').trim();
     const phone = String(fields.get('phone') ?? '').trim();
-    const supportPhone = String(fields.get('support_phone') ?? '').trim();
-    const foundedYear = String(fields.get('founded_year') ?? '').trim();
-    const projectsCount = String(fields.get('projects_count') ?? '').trim();
 
-    if (!email || !password ||
-      (mode === 'register' && registrationRole === 'client' && !fullName) ||
-      (mode === 'register' && registrationRole === 'company' && !companyName)) {
+    if (!email || !password || (mode === 'register' && !fullName)) {
       setError('auth.requiredFields');
       return;
     }
@@ -133,67 +114,26 @@ export function AuthModal() {
       setError('auth.passwordShort');
       return;
     }
-    if (mode === 'register' && registrationRole === 'client' && fullName.length < 2) {
+    if (mode === 'register' && fullName.length < 2) {
       setError('auth.nameShort');
       return;
     }
-    if (mode === 'register' && registrationRole === 'company' && companyName.length < 2) {
-      setError('auth.nameShort');
-      return;
-    }
-    if (mode === 'register' && registrationRole === 'company' && (!phone || !supportPhone)) {
-      setError('auth.requiredFields');
-      return;
-    }
-    if (mode === 'register' && registrationRole === 'company' && !isValidIraqiMobile(phone)) {
+    if (mode === 'register' && phone && !/^07\d{9}$/.test(phone)) {
       setError('auth.phoneInvalid');
       return;
-    }
-    if (mode === 'register' && registrationRole === 'client' && phone && !/^07\d{9}$/.test(phone)) {
-      setError('auth.phoneInvalid');
-      return;
-    }
-    if (mode === 'register' && registrationRole === 'company' && !isValidSupportPhone(supportPhone)) {
-      setError('auth.phoneInvalid');
-      return;
-    }
-    if (mode === 'register' && registrationRole === 'company' && foundedYear) {
-      const year = Number(foundedYear);
-      if (!Number.isInteger(year) || year < 1900 || year > new Date().getFullYear()) {
-        setError('auth.foundedInvalid');
-        return;
-      }
-    }
-    if (mode === 'register' && registrationRole === 'company' && projectsCount) {
-      const count = Number(projectsCount);
-      if (!Number.isInteger(count) || count < 0 || count > 100000) {
-        setError('auth.projectsInvalid');
-        return;
-      }
     }
     setBusy(true);
     try {
       if (mode === 'login') {
-        await login(email, password);
-      } else if (registrationRole === 'client') {
+        const signedIn = await login(email, password);
+        // A company that signs in here is taken to its own portal.
+        if (signedIn.role === 'company') window.location.hash = '#/company';
+      } else {
         await registerClient({
           full_name: fullName,
           email,
           phone: phone || undefined,
           password,
-        });
-      } else {
-        await registerCompany({
-          name: companyName,
-          email,
-          phone: phone || undefined,
-          support_phone: supportPhone || undefined,
-          password,
-          founded_year: foundedYear ? Number(foundedYear) : undefined,
-          address: String(fields.get('address') || '') || undefined,
-          business_license_number: String(fields.get('license') || '') || undefined,
-          tax_registration_number: String(fields.get('tax_number') || '') || undefined,
-          projects_count: projectsCount ? Number(projectsCount) : 0,
         });
       }
       closeAuthModal();
@@ -227,7 +167,7 @@ export function AuthModal() {
         <div className="flex items-start justify-between gap-4">
           <div>
             <h2 id="auth-title" className="text-h3 text-content-primary">{user ? text.signedIn : mode === 'login' ? text.login : text.register}</h2>
-            {user && <p className="mt-1 text-body-sm text-content-secondary">{user.full_name} · {user.role}</p>}
+            {user && <p className="mt-1 text-body-sm text-content-secondary">{user.full_name} · {roleLabel[user.role]}</p>}
           </div>
           <button type="button" aria-label={text.close} onClick={closeAuthModal} className="grid h-10 w-10 shrink-0 place-items-center rounded-md text-content-secondary hover:bg-bg-subtle"><Icon name="x-mark" /></button>
         </div>
@@ -250,35 +190,16 @@ export function AuthModal() {
                 </button>
               ))}
             </div>
-            {mode === 'register' && (
-              <div className="mt-5 flex gap-2" role="group" aria-label={t('auth.accountType')}>
-                {(['client', 'company'] as const).map((role) => (
-                  <button key={role} type="button" onClick={() => { setRegistrationRole(role); setShowPassword(false); setError(''); }} aria-pressed={registrationRole === role} className={`rounded-md border px-4 py-2 text-label ${registrationRole === role ? 'border-line-brand bg-[var(--brand-subtle)] text-content-brand' : 'border-line text-content-secondary'}`}>
-                    {role === 'client' ? text.client : text.company}
-                  </button>
-                ))}
-              </div>
-            )}
             {error && <p role="alert" className="mt-4 rounded-md border border-[var(--status-danger)] bg-[var(--status-danger-bg)] px-3 py-2 text-body-sm text-[var(--status-danger)]">{t(error)}</p>}
             <form
-              key={`${mode}-${registrationRole}`}
+              key={mode}
               className="mt-5 grid gap-4 sm:grid-cols-2"
               onSubmit={submit}
               onChange={() => setError('')}
               noValidate
               autoComplete="off"
             >
-              {mode === 'register' && registrationRole === 'client' && <Input label={text.name} name="full_name" autoComplete="name" required minLength={2} />}
-              {mode === 'register' && registrationRole === 'company' && <>
-                <Input label={text.companyName} name="company_name" autoComplete="off" required minLength={2} />
-                <Input label={text.founded} name="founded_year" type="number" autoComplete="off" min="1900" max={new Date().getFullYear()} optional optionalLabel={ar ? 'اختياري' : 'Optional'} />
-                <Input label={ar ? 'رقم الموبايل العراقي' : 'Iraqi Mobile Phone'} name="phone" type="tel" inputMode="numeric" autoComplete="tel" pattern={IRAQI_MOBILE_PATTERN} maxLength={11} placeholder="077 / 078 / 075 XXXXXXXX" required />
-                <Input label={ar ? 'رقم الدعم السريع للشركة' : 'Company Support Hotline'} name="support_phone" type="tel" inputMode="tel" autoComplete="off" pattern={SUPPORT_PHONE_PATTERN} maxLength={11} placeholder="07XXXXXXXXX or 6060" required />
-                <Input label={text.address} name="address" autoComplete="off" optional optionalLabel={ar ? 'اختياري' : 'Optional'} />
-                <Input label={text.license} name="license" autoComplete="off" optional optionalLabel={ar ? 'اختياري' : 'Optional'} />
-                <Input label={text.tax} name="tax_number" autoComplete="off" optional optionalLabel={ar ? 'اختياري' : 'Optional'} />
-                <Input label={text.projects} name="projects_count" type="number" autoComplete="off" min="0" optional optionalLabel={ar ? 'اختياري' : 'Optional'} />
-              </>}
+              {mode === 'register' && <Input label={text.name} name="full_name" autoComplete="name" required minLength={2} />}
               <Input
                 label={text.email}
                 name={mode === 'login' ? 'login_identifier' : 'email'}
@@ -289,7 +210,7 @@ export function AuthModal() {
                 onFocus={mode === 'login' ? () => setLoginFieldsUnlocked(true) : undefined}
                 required
               />
-              {mode === 'register' && registrationRole === 'client' && <Input label={text.phone} name="phone" type="tel" inputMode="numeric" autoComplete="off" pattern="07[0-9]{9}" maxLength={11} optional optionalLabel={ar ? 'اختياري' : 'Optional'} />}
+              {mode === 'register' && <Input label={text.phone} name="phone" type="tel" inputMode="numeric" autoComplete="off" pattern="07[0-9]{9}" maxLength={11} optional optionalLabel={ar ? 'اختياري' : 'Optional'} />}
               <Input
                 label={text.password}
                 name={mode === 'login' ? 'login_secret' : 'password'}
@@ -305,6 +226,10 @@ export function AuthModal() {
                 <Button type="submit" loading={busy}>{text.submit}</Button>
               </div>
             </form>
+            <p className="mt-6 border-t border-line-subtle pt-4 text-body-sm text-content-secondary">
+              {text.companyDoor}{' '}
+              <a href="#/company" onClick={closeAuthModal} className="text-content-brand underline">{text.companyDoorLink}</a>
+            </p>
           </>
         )}
       </section>
