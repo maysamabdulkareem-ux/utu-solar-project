@@ -16,12 +16,13 @@ import { MAX_COMPANIES, type StepErrors } from './validation';
  * hand over.
  */
 export function StepCompanies({ errors }: { errors: StepErrors }) {
-  const { t, pick } = useLanguage();
+  const { t, pick, lang } = useLanguage();
   const { draft, update } = useQuoteRequest();
-  const { companies } = useCompanies();
+  const { companies, source } = useCompanies();
 
   const selected = draft.companyIds;
   const atLimit = selected.length >= MAX_COMPANIES;
+  const includesPending = companies.some((company) => company.status === 'pending');
 
   const toggle = (id: string) => {
     if (selected.includes(id)) {
@@ -41,9 +42,25 @@ export function StepCompanies({ errors }: { errors: StepErrors }) {
         <p className="numeric mt-3 text-label text-content-brand">
           {t('s4.selected', { n: selected.length, max: MAX_COMPANIES })}
         </p>
+        {includesPending && (
+          <p role="note" className="mt-3 rounded-md border border-[var(--status-warning)] bg-[var(--status-warning-bg)] px-4 py-3 text-body-sm text-content-secondary">
+            {lang === 'ar'
+              ? 'تگدر تختار شركة «قيد التحقق»، لكن بياناتها وأدلتها ما مكتملة المراجعة بعد. راجع شارة كل شركة قبل الإرسال.'
+              : 'You can choose a company marked "Pending verification", but its business and project evidence has not completed review. Check each badge before sending.'}
+          </p>
+        )}
       </header>
 
       <ul className="flex flex-col gap-4">
+        {companies.length === 0 && (
+          <li role="status" className="rounded-lg border border-line-subtle bg-bg-surface px-5 py-4 text-body-sm text-content-secondary">
+            {source === 'loading'
+              ? (lang === 'ar' ? 'جارٍ تحميل الشركات…' : 'Loading installers…')
+              : source === 'unavailable'
+                ? (lang === 'ar' ? 'تعذّر تحميل الشركات. تأكد من تشغيل الخدمة ثم أعد المحاولة.' : 'Companies could not be loaded. Check the service and try again.')
+                : <>{lang === 'ar' ? 'ماكو شركات مسجلة متاحة لطلب عرض حالياً. ' : 'There are no registered companies to request a quote from yet. '}<a className="text-content-brand underline" href="#/company">{lang === 'ar' ? 'سجّل شركتك' : 'Register a company'}</a></>}
+          </li>
+        )}
         {companies.map((company) => {
           const isSelected = selected.includes(company.id);
           const disabled = !isSelected && atLimit;

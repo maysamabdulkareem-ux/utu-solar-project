@@ -20,8 +20,8 @@ export function LanguageToggle({ className }: { className?: string }) {
       onClick={toggle}
       aria-label={t('a11y.switchLang')}
       className={cn(
-        'inline-flex min-h-10 items-center gap-2 rounded-full border border-line-on-dark',
-        'bg-bg-panel-raised px-3.5 py-2 text-[0.8125rem] font-semibold text-content-on-dark',
+        'inline-flex min-h-11 items-center gap-2 rounded-full border border-line-on-dark',
+        'bg-bg-panel-raised px-4 py-2 text-sm font-semibold text-content-on-dark',
         'transition-colors hover:border-solar-400 hover:bg-panel-600',
         className,
       )}

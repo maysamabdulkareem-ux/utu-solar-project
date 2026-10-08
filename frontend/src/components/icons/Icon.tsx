@@ -45,7 +45,10 @@ export type IconName =
   | 'facebook'
   | 'instagram'
   | 'linkedin'
-  | 'x-social';
+  | 'x-social'
+  | 'eye'
+  | 'eye-off'
+  | 'bell';
 
 const PATHS: Record<IconName, ReactElement> = {
   sun: (
@@ -224,6 +227,24 @@ const PATHS: Record<IconName, ReactElement> = {
     </>
   ),
   'x-social': <path d="M4.5 4.5 19.5 19.5M19.5 4.5 4.5 19.5" />,
+  eye: (
+    <>
+      <path d="M2.2 12s3.4-6.5 9.8-6.5 9.8 6.5 9.8 6.5-3.4 6.5-9.8 6.5S2.2 12 2.2 12Z" />
+      <circle cx="12" cy="12" r="3" />
+    </>
+  ),
+  'eye-off': (
+    <>
+      <path d="M3 3 21 21M10.6 10.7a2 2 0 0 0 2.7 2.7" />
+      <path d="M9.9 5.7A10.9 10.9 0 0 1 12 5.5c6.4 0 9.8 6.5 9.8 6.5a15 15 0 0 1-3.1 3.8M6.2 6.3C3.6 8 2.2 12 2.2 12s3.4 6.5 9.8 6.5c1 0 2-.2 2.9-.5" />
+    </>
+  ),
+  bell: (
+    <>
+      <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9Z" />
+      <path d="M10 21h4" />
+    </>
+  ),
 };
 
 type IconProps = SVGProps<SVGSVGElement> & {

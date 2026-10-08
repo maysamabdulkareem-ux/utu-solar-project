@@ -10,7 +10,7 @@ import { useQuoteRequest } from '../../state/QuoteRequestProvider';
 import { paths } from '../../routes/useHashRoute';
 
 /**
- * The AI Solar Load Calculator panel.
+ * The solar load estimate panel.
  *
  * The maths is real (see useSolarEstimate) but the inputs are a demo
  * configuration, so every surface that shows a number also says it is an
@@ -19,10 +19,9 @@ import { paths } from '../../routes/useHashRoute';
  */
 export function SolarCalculator() {
   const { t } = useLanguage();
-  const { seedFromEstimate } = useQuoteRequest();
+  const { reset } = useQuoteRequest();
   const [appliances, setAppliances] = useState<Appliance[]>(defaultAppliances);
   const [activeId, setActiveId] = useState<string>(defaultAppliances[0].id);
-  const [calculating, setCalculating] = useState(false);
   const [calculated, setCalculated] = useState(false);
 
   const estimate = useSolarEstimate(appliances);
@@ -41,18 +40,11 @@ export function SolarCalculator() {
     }
   };
 
-  const runCalculation = () => {
-    setCalculating(true);
-    // Stands in for the request that would size the system server-side.
-    window.setTimeout(() => {
-      setCalculating(false);
-      setCalculated(true);
-    }, 1200);
-  };
+  const runCalculation = () => setCalculated(true);
 
-  /** Hand the sized system to the request flow so nothing is retyped. */
+  /** Start with a clean request; the calculator remains an optional estimate. */
   const requestQuotes = () => {
-    seedFromEstimate(estimate);
+    reset();
     window.location.hash = paths.request;
   };
 
@@ -156,10 +148,9 @@ export function SolarCalculator() {
         <Button
           variant={calculated ? 'onDark' : 'primary'}
           onClick={runCalculation}
-          loading={calculating}
           disabled={isEmpty}
         >
-          {calculating ? t('panel.calculating') : t('panel.btn')}
+          {t('panel.btn')}
         </Button>
         <p className="min-w-[12rem] flex-1 text-label-sm text-content-on-dark-muted">
           {t('panel.disclaimer')}

@@ -13,11 +13,13 @@ export function Rating({
   reviewCount,
   size = 15,
   className,
+  tone = 'default',
 }: {
   score: number;
   reviewCount?: number;
   size?: number;
   className?: string;
+  tone?: 'default' | 'onDark';
 }) {
   const { t } = useLanguage();
   const filled = Math.round(score);
@@ -34,15 +36,15 @@ export function Rating({
             key={i}
             name="star"
             size={size}
-            className={i < filled ? 'text-solar-500' : 'text-sand-300'}
+            className={i < filled ? (tone === 'onDark' ? 'text-amber-400' : 'text-solar-500') : 'text-sand-300'}
           />
         ))}
       </span>
-      <span className="numeric text-label text-content-primary" aria-hidden="true">
+      <span className={cn('numeric text-label', tone === 'onDark' ? 'text-amber-300' : 'text-content-primary')} aria-hidden="true">
         {score.toFixed(1)}
       </span>
       {reviewCount !== undefined && (
-        <span className="text-label-sm text-content-tertiary" aria-hidden="true">
+        <span className={cn('text-label-sm', tone === 'onDark' ? 'text-amber-200/80' : 'text-content-tertiary')} aria-hidden="true">
           {t('rate.reviews', { c: reviewCount })}
         </span>
       )}

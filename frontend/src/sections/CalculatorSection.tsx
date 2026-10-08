@@ -15,6 +15,7 @@ export function CalculatorSection() {
       aria-labelledby="calculator-heading"
       className="on-dark relative overflow-hidden bg-bg-panel-deep"
     >
+      <span id="services" className="absolute inset-x-0 top-0 scroll-mt-24" aria-hidden="true" />
       <div
         aria-hidden="true"
         className="pointer-events-none absolute right-[-10%] top-[-30%] h-[940px] w-[1240px]"

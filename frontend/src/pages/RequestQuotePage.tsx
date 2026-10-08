@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '../components/ui/Button';
 import { Icon } from '../components/icons/Icon';
 import { FlowHeader } from '../components/layout/FlowHeader';
@@ -32,7 +32,17 @@ export function RequestQuotePage() {
   const [step, setStep] = useState(0);
   const [errors, setErrors] = useState<StepErrors>({});
   const [sending, setSending] = useState(false);
+  const [submitError, setSubmitError] = useState('');
   const [done, setDone] = useState<SubmittedRequest | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    reset();
+    setStep(0);
+    setErrors({});
+    setReady(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, [reset]);
 
   const translateErrors = useCallback(
     (raw: ReturnType<typeof validateStep>): StepErrors =>
@@ -68,19 +78,24 @@ export function RequestQuotePage() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     setSending(true);
-    // Stands in for the POST that would fan the request out to each company.
-    window.setTimeout(() => {
-      const request = submit();
-      setSending(false);
+    setSubmitError('');
+    try {
+      const request = await submit();
       setDone(request);
       reset();
+      setStep(0);
       window.scrollTo({ top: 0, behavior: 'auto' });
-    }, 1100);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Request could not be sent. Please try again.');
+    } finally {
+      setSending(false);
+    }
   };
 
   if (done) return <Confirmation request={done} />;
+  if (!ready) return null;
 
   const hasErrors = Object.keys(errors).length > 0;
 
@@ -142,6 +157,11 @@ export function RequestQuotePage() {
               </p>
             )}
           </div>
+          {submitError && (
+            <p role="alert" className="mt-4 rounded-lg border border-[var(--status-danger)] bg-[var(--status-danger-bg)] px-4 py-3 text-body-sm text-[var(--status-danger)]">
+              {submitError}
+            </p>
+          )}
         </div>
       </main>
     </>

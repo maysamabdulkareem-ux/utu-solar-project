@@ -61,9 +61,11 @@ export function StepSystem({ errors }: { errors: StepErrors }) {
           type="number"
           inputMode="decimal"
           min={0.5}
+          max={5000}
           step={0.1}
+          placeholder={t('s1.sizePlaceholder')}
           suffix="kWp"
-          value={draft.systemKWp}
+          value={draft.systemKWp || ''}
           error={errors.systemKWp}
           onChange={(e) => update({ systemKWp: Number(e.target.value) })}
         />
@@ -72,9 +74,12 @@ export function StepSystem({ errors }: { errors: StepErrors }) {
           type="number"
           inputMode="decimal"
           min={0}
+          max={10000}
           step={0.1}
+          placeholder={t('s1.batteryPlaceholder')}
           suffix="kWh"
-          value={draft.batteryKWh}
+          value={draft.batteryKWh || ''}
+          error={errors.batteryKWh}
           onChange={(e) => update({ batteryKWh: Number(e.target.value) })}
         />
         <Input
@@ -82,8 +87,10 @@ export function StepSystem({ errors }: { errors: StepErrors }) {
           type="number"
           inputMode="numeric"
           min={1}
+          max={10000}
           step={1}
-          value={draft.panelCount}
+          placeholder={t('s1.panelsPlaceholder')}
+          value={draft.panelCount || ''}
           error={errors.panelCount}
           onChange={(e) => update({ panelCount: Number(e.target.value) })}
         />

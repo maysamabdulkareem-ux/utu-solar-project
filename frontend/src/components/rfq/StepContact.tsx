@@ -42,8 +42,10 @@ export function StepContact({
           label={t('s5.phone')}
           hint={t('s5.phoneHint')}
           type="tel"
-          inputMode="tel"
+          inputMode="numeric"
           autoComplete="tel"
+          maxLength={11}
+          pattern="07[0-9]{9}"
           dir="ltr"
           value={draft.phone}
           error={errors.phone}
@@ -67,6 +69,7 @@ export function StepContact({
           dir="ltr"
           optional
           optionalLabel={t('rfq.optional')}
+          error={errors.email}
           value={draft.email}
           onChange={(e) => update({ email: e.target.value })}
         />

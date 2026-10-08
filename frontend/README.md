@@ -1,7 +1,7 @@
 # Utu — Solar Energy Marketplace (Iraq)
 
-Homepage implementation for a verified solar marketplace: customers calculate
-what they need, then compare companies that have actually built it.
+Iraqi solar marketplace frontend: customers estimate system needs, request
+quotes, and compare offers submitted by listed companies with clear verification badges.
 
 Visual identity: **sunset light reflecting on a solar panel** — deep graphite
 structure, golden solar energy, coral sunset accents.
@@ -14,9 +14,17 @@ structure, golden solar energy, coral sunset accents.
 npm install
 npm run dev      # http://localhost:5173
 npm run build    # type-check + production build
+npm test         # Vitest + React Testing Library
 ```
 
 Requires Node 18+.
+
+The FastAPI service, local database setup, and marketplace API routes are
+documented in [`../backend/README.md`](../backend/README.md).
+The frontend defaults to `http://localhost:8000` for the API. If the backend
+uses another port, set `VITE_API_URL` (for example,
+`VITE_API_URL=http://127.0.0.1:8001` in `.env.development.local`) and restart
+Vite. The development-specific file keeps local URLs out of production builds.
 
 ---
 
@@ -171,8 +179,10 @@ pick(company.name)      // the current language out of a Localized<T> pair
 
 - **UI strings** live in `src/i18n/translations.ts`. `TranslationKey` is derived
   from the English object, so a key missing from Arabic is a build error.
-- **Content** lives in `src/data/content.ts` as `Localized<T>` pairs
-  (`{ en, ar }`). When this is wired to an API, the shape stays the same.
+- **Static showcase content** lives in `src/data/content.ts` as `Localized<T>`
+  pairs (`{ en, ar }`). The completed-project section loads project records and
+  installer details from the API, with bundled examples used only when the API
+  is unavailable. Project detail labels are translated in both languages.
 - **The choice persists** in `localStorage`, wrapped in try/catch — a private
   window falls back to English instead of throwing.
 
@@ -217,6 +227,25 @@ Check it at `dir="rtl"` before merging, and prefer logical properties over
 
 ## Known gaps
 
-- Content is static; wire `data/content.ts` to the API.
-- The "Calculate My System" button simulates a request with a timeout.
-- Company, project and review links are placeholders (`#top`).
+- Review cards come from the verified-review API, but the included demo seed
+  comments are examples, not real customer endorsements. Replace them with
+  customer-approved reviews before public launch. Warranty and homepage metric
+  content remains illustrative.
+- The footer exposes external social links only when the corresponding
+  `VITE_SOCIAL_FACEBOOK`, `VITE_SOCIAL_INSTAGRAM`, `VITE_SOCIAL_LINKEDIN`, or
+  `VITE_SOCIAL_X` URL is configured. Section and RFQ/company links are local.
+- Company signup allows incomplete details; approval requires a checked license, checked tax record, and at least
+  three completed projects. The admin checklist records manual checks, but
+  secure evidence-document upload and in-app document review are not implemented.
+- Customers retrieve requests using a private browser-stored access token;
+  phone verification, account recovery and cross-device access need an OTP
+  provider and customer account flow.
+- The RFQ draft and active wizard step survive page refreshes in local storage.
+  Starting the RFQ from the calculator clears an older draft and seeds the
+  current estimate; the same numeric limits are enforced in the browser and API.
+- Email, SMS and WhatsApp notifications are not connected. Companies see new
+  requests when they sign in to the portal.
+- Project/profile links and the quote "choose" action are not connected to a
+  signed contract or project lifecycle.
+- The local database uses `create_all`; add managed schema migrations,
+  backups, rate limits and a production security review before deployment.
