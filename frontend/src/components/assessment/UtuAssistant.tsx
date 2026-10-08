@@ -43,6 +43,7 @@ export function UtuAssistant({
   companyCount,
   open,
   onOpenChange,
+  showFloatingButton = true,
 }: {
   estimate: SolarEstimate;
   tier: SystemTier;
@@ -51,6 +52,8 @@ export function UtuAssistant({
   /** Controlled by the page so an in-page button can open it too. */
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** False when the page shows its own button for the assistant. */
+  showFloatingButton?: boolean;
 }) {
   const { t } = useLanguage();
   const setOpen = onOpenChange;
@@ -94,7 +97,7 @@ export function UtuAssistant({
 
   return (
     <>
-      <button
+      {showFloatingButton && <button
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
@@ -102,7 +105,7 @@ export function UtuAssistant({
       >
         <Icon name="zap" size={17} />
         {t('as.assistant.entry')}
-      </button>
+      </button>}
 
       <AnimatePresence>
         {open && (
@@ -123,7 +126,7 @@ export function UtuAssistant({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 24 }}
               transition={{ duration: 0.22 }}
-              className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-line-subtle bg-bg-surface shadow-lg sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[560px] sm:w-[380px] sm:rounded-2xl sm:border"
+              className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-line-subtle bg-bg-surface shadow-lg sm:inset-auto sm:end-6 sm:top-24 sm:h-[560px] sm:max-h-[calc(100vh-7rem)] sm:w-[380px] sm:rounded-2xl sm:border"
             >
               <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-5 py-4">
                 <h2 id="utu-assistant-title" className="text-label font-semibold text-content-primary">{t('as.assistant.title')}</h2>
