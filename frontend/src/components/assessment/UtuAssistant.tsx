@@ -28,9 +28,6 @@ function formatValues(values: AnswerValues): Record<string, string | number> {
 type ChatEntry = { from: 'assistant' | 'user'; text: string };
 
 /**
- * The floating button and the panel stay on the bottom-right in both
- * languages, where people look for a chat button.
- *
  * UTU assistant on the assessment page — a side panel on desktop, a bottom
  * sheet on mobile. Not a general chatbot: each quick question is answered
  * from this assessment's own numbers by `answerQuickQuestion`. A real AI
@@ -98,7 +95,7 @@ export function UtuAssistant({
         type="button"
         onClick={() => setOpen(true)}
         aria-haspopup="dialog"
-        className="fixed bottom-6 right-6 z-40 flex items-center gap-2 rounded-full bg-[var(--brand-primary)] px-5 py-3.5 text-label font-semibold text-content-on-brand shadow-lg ring-4 ring-[var(--brand-subtle)] transition-colors hover:bg-[var(--brand-primary-hover)]"
+        className="fixed bottom-6 end-6 z-40 flex items-center gap-2 rounded-full bg-[var(--brand-primary)] px-5 py-3.5 text-label font-semibold text-content-on-brand shadow-lg ring-4 ring-[var(--brand-subtle)] transition-colors hover:bg-[var(--brand-primary-hover)]"
       >
         <Icon name="zap" size={17} />
         {t('as.assistant.entry')}
@@ -123,7 +120,7 @@ export function UtuAssistant({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 24 }}
               transition={{ duration: 0.22 }}
-              className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-line-subtle bg-bg-surface shadow-lg sm:inset-auto sm:bottom-6 sm:right-6 sm:h-[560px] sm:w-[380px] sm:rounded-2xl sm:border"
+              className="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col rounded-t-2xl border-t border-line-subtle bg-bg-surface shadow-lg sm:inset-auto sm:bottom-6 sm:end-6 sm:h-[560px] sm:w-[380px] sm:rounded-2xl sm:border"
             >
               <div className="flex items-center justify-between gap-3 border-b border-line-subtle px-5 py-4">
                 <h2 id="utu-assistant-title" className="text-label font-semibold text-content-primary">{t('as.assistant.title')}</h2>
