@@ -75,38 +75,26 @@ export function AssessmentPage() {
     <>
       <FlowHeader />
       <main id="main" className="bg-bg-page pb-24">
-        <header className="container-page flex flex-wrap items-start justify-between gap-6 pt-10">
-          <div className="min-w-0 flex-1">
-            <a href="#calculator" className="inline-flex items-center gap-1.5 text-label-sm text-content-brand underline underline-offset-2">
-              <Icon name="arrow-right" size={14} className="-scale-x-100 rtl:scale-x-100" />
-              {t('as.back')}
-            </a>
-            <h1 className="mt-4 text-h1 text-content-primary">{t('as.title')}</h1>
-            <p className="mt-2 max-w-2xl text-body text-content-secondary">{t('as.subtitle')}</p>
-            <button
-              type="button"
-              onClick={() => setAssistantOpen(true)}
-              aria-haspopup="dialog"
-              className="mt-5 inline-flex items-center gap-3 rounded-xl border-[1.5px] border-line-brand bg-[var(--brand-subtle)] px-4 py-3 text-start transition-colors hover:bg-bg-surface"
-            >
-              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--brand-primary)] text-content-on-brand">
-                <Icon name="zap" size={17} />
-              </span>
-              <span>
-                <span className="block text-label font-semibold text-content-primary">{t('as.assistant.inlineTitle')}</span>
-                <span className="block text-label-sm text-content-secondary">{t('as.assistant.inlineBody')}</span>
-              </span>
-            </button>
-          </div>
-          {/* Top-corner entry to the assistant (left in Arabic, right in English). */}
+        <header className="container-page pt-10">
+          <a href="#calculator" className="inline-flex items-center gap-1.5 text-label-sm text-content-brand underline underline-offset-2">
+            <Icon name="arrow-right" size={14} className="-scale-x-100 rtl:scale-x-100" />
+            {t('as.back')}
+          </a>
+          <h1 className="mt-4 text-h1 text-content-primary">{t('as.title')}</h1>
+          <p className="mt-2 max-w-2xl text-body text-content-secondary">{t('as.subtitle')}</p>
           <button
             type="button"
             onClick={() => setAssistantOpen(true)}
             aria-haspopup="dialog"
-            className="flex shrink-0 items-center gap-2 rounded-full bg-[var(--brand-primary)] px-5 py-3.5 text-label font-semibold text-content-on-brand shadow-lg ring-4 ring-[var(--brand-subtle)] transition-colors hover:bg-[var(--brand-primary-hover)]"
+            className="mt-5 inline-flex items-center gap-3 rounded-xl border-[1.5px] border-line-brand bg-[var(--brand-subtle)] px-4 py-3 text-start transition-colors hover:bg-bg-surface"
           >
-            <Icon name="zap" size={17} />
-            {t('as.assistant.entry')}
+            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[var(--brand-primary)] text-content-on-brand">
+              <Icon name="zap" size={17} />
+            </span>
+            <span>
+              <span className="block text-label font-semibold text-content-primary">{t('as.assistant.inlineTitle')}</span>
+              <span className="block text-label-sm text-content-secondary">{t('as.assistant.inlineBody')}</span>
+            </span>
           </button>
         </header>
 
@@ -135,7 +123,6 @@ export function AssessmentPage() {
         companyCount={quotable.length}
         open={assistantOpen}
         onOpenChange={setAssistantOpen}
-        showFloatingButton={false}
       />
     </>
   );
